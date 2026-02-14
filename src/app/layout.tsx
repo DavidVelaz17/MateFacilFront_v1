@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Divertimate",
+  title: "MateFácil",
   description: "Matemáticas divertídas",
 };
 
