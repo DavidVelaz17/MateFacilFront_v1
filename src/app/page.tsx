@@ -14,7 +14,7 @@ export default function Login() {
     return (
         <div className="flex min-h-screen items-center justify-center bg-gray-100">
             <form onSubmit={handleLogin} className="w-96 bg-white p-8 rounded-lg shadow-md">
-                <h1 className="text-2xl font-bold mb-6 text-center text-blue-600">Divertimate</h1>
+                <h1 className="text-2xl font-bold mb-6 text-center text-blue-600">MateFácil</h1>
                 <div className="mb-4">
                     <label className="block text-gray-700 text-sm font-bold mb-2">Usuario</label>
                     <input type="text" className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black" placeholder="usuario" required />
