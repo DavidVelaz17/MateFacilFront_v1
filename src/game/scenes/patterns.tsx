@@ -9,9 +9,15 @@ export const EventBus = new Phaser.Events.EventEmitter();
 // 2. STRATEGY
 // ==========================================
 export class MathStrategy {
+    private targetNumbers: number[];
+
+    constructor(targets: number[]) {
+        this.targetNumbers = targets;
+    }
+
     validate(numbersCollected: number[]): boolean {
-        if (numbersCollected.length !== 2) return false;
-        return numbersCollected.includes(5) && numbersCollected.includes(10);
+        if (numbersCollected.length !== this.targetNumbers.length) return false;
+        return this.targetNumbers.every(target => numbersCollected.includes(target));
     }
 }
 
@@ -109,6 +115,8 @@ export class LevelBuilder {
     private platforms: Phaser.Physics.Arcade.StaticGroup;
     private items: Phaser.Physics.Arcade.Group;
     private door: Phaser.Types.Physics.Arcade.SpriteWithStaticBody | null = null;
+    private boundsWidth: number = 800;
+    private boundsHeight: number = 600;
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
@@ -133,7 +141,86 @@ export class LevelBuilder {
     }
 
     addDoor(x: number, y: number) {
-        this.door = this.scene.physics.add.staticSprite(x, y, 'door').setScale(0.4).refreshBody();
+        this.door = this.scene.physics.add.staticSprite(x, y, 'door').setScale(0.25).refreshBody();
+        return this;
+    }
+
+    addRandomPlatformsWithItems(platformCount: number, itemsToPlace: number[]) {
+        // Ajusta estas medidas según el tamaño real de tu imagen 'platform.png'
+        const texture = this.scene.textures.get('platform').getSourceImage();
+        const scale = 0.1;
+        const pWidth = texture.width * scale;
+        const pHeight = texture.height * scale;
+        // Padding: Cuánto espacio extra dejamos entre plataformas para que el axolote pueda pasar
+        const paddingX = 60;
+        const paddingY = 80;
+        const maxJumpDistanceX = 200; // Distancia máxima horizontal segura
+        const maxJumpDistanceY = 160; // Altura máxima vertical segura
+
+        const startY = this.boundsHeight - 120;
+        // Guardamos las coordenadas de las plataformas que vamos validando
+        const placedPositions: {x: number, y: number}[] = [
+            { x: 100, y: startY}
+        ];
+
+        // Hacemos una copia del arreglo de ítems para ir sacándolos
+        const itemsQueue = [...itemsToPlace];
+
+        for (let i = 0; i < platformCount; i++) {
+            let isValid = false;
+            let attempts = 0;
+            let randX = 0;
+            let randY = 0;
+
+            // Intentamos hasta 100 veces encontrar un hueco libre para cada plataforma
+            while (!isValid && attempts < 150) {
+                // Generar posición aleatoria (evitando los bordes de la pantalla)
+                randX = Phaser.Math.Between(pWidth, this.boundsWidth - pWidth);
+                randY = Phaser.Math.Between(100, this.boundsHeight - 140);
+
+                // 1. Evitar que se generen encima del jugador (Inicio) o la puerta (Final)
+                const isNearStart = randX < 150 && randY > this.boundsHeight - 150;
+                const isNearDoor = randX > this.boundsWidth - 250 && randY > this.boundsHeight - 250;
+
+                isValid = !isNearStart && !isNearDoor;
+
+                // 2. Comprobar que no choque con plataformas ya colocadas
+                if (isValid) {
+                    let isReachable = false;
+                    let isOverlapping = false;
+                    for (const pos of placedPositions) {
+                        const distanceX = Math.abs(randX - pos.x);
+                        const distanceY = pos.y - randY;
+                        const absoluteDistY = Math.abs(distanceY);
+
+                        // Si la distancia horizontal Y vertical es menor al tamaño + padding, colisionan
+                        if (distanceX < (pWidth + paddingX) && absoluteDistY < (pHeight + paddingY)) {
+                            isOverlapping = true;
+                            break; // Dejamos de revisar, ya sabemos que no cabe
+                        }
+                        if (distanceX <= maxJumpDistanceX && distanceY <= maxJumpDistanceY) {
+                            isReachable = true;
+                        }
+                    }
+                    isValid = !isOverlapping && isReachable;
+                }
+                attempts++;
+            }
+
+            // Si después de los intentos encontramos un lugar válido...
+            if (isValid) {
+                // La dibujamos físicamente
+                this.addPlatform(randX, randY);
+                // Guardamos sus coordenadas para que las siguientes no choquen con esta
+                placedPositions.push({ x: randX, y: randY });
+
+                // ¿Quedan números por colocar? Lo ponemos 40 píxeles por encima de esta plataforma
+                if (itemsQueue.length > 0) {
+                    const numberValue = itemsQueue.pop()!;
+                    this.addNumberItem(randX, randY - 50, numberValue);
+                }
+            }
+        }
         return this;
     }
 
@@ -156,12 +243,24 @@ export class UIFacade {
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
 
+        // 1. Escuchar la actualización de estrellas
         EventBus.on('updateCoins', (coins: number) => {
-            if (this.coinsText) this.coinsText.setText(`Estrellas: ${coins}`);
+            if (this.coinsText && this.coinsText.active) {
+                this.coinsText.setText(`Estrellas: ${coins}`);
+            }
         });
 
+        // 2. Escuchar la actualización del tiempo
         EventBus.on('updateTime', (time: number) => {
-            if (this.timeText) this.timeText.setText(`Tiempo: ${Math.floor(time)}s`);
+            if (this.timeText && this.timeText.active) {
+                this.timeText.setText(`Tiempo: ${Math.floor(time)}s`);
+            }
+        });
+
+        // 3. Limpiar los fantasmas al reiniciar la escena
+        this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            EventBus.off('updateTime');
+            EventBus.off('updateCoins');
         });
     }
 
