@@ -21,7 +21,7 @@ interface Student {
     Nombre_Discente: string;
     Apellido_Paterno_Discente: string;
     Apellido_Materno_Discente: string;
-    grupos?: Group[]; // 🔴 CORRECCIÓN: Ahora el alumno sabe a qué grupos pertenece
+    grupos?: Group[]; // CORRECCIÓN: Ahora el alumno sabe a qué grupos pertenece
 }
 
 export default function Dashboard() {
@@ -74,7 +74,7 @@ export default function Dashboard() {
         }
     };
 
-    // 🔴 FILTRO MÁGICO: Solo nos quedamos con los alumnos que tengan el ID del grupo activo
+    // Solo nos quedamos con los alumnos que tengan el ID del grupo activo
     const filteredStudents = students.filter(student =>
         student.grupos?.some(g => g.id_grupo === activeGroupId)
     );
@@ -309,7 +309,7 @@ export default function Dashboard() {
                                 </tr>
                                 </thead>
                                 <tbody className="text-gray-700 text-sm">
-                                {/* 🔴 CORRECCIÓN: Usamos filteredStudents en lugar de todos los students */}
+                                {/* CORRECCIÓN: Usamos filteredStudents en lugar de todos los students */}
                                 {filteredStudents.length === 0 ? (
                                     <tr><td colSpan={2} className="text-center py-8 text-gray-500 italic">No hay alumnos en este grupo</td></tr>
                                 ) : (

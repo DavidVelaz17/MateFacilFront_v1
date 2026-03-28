@@ -16,11 +16,15 @@ export default function PhaserGame() {
                 parent: 'phaser-game',
                 width: 800,
                 height: 600,
+                scene: [MainScene],
                 physics: {
                     default: 'arcade',
-                    arcade: { gravity: { y: 0 } }
+                    arcade: {
+                        gravity: { y: 800 },
+                        debug: false
+                    }
                 },
-                scene: [MainScene],
+                transparent: true,
             };
 
             if (!gameRef.current) {
