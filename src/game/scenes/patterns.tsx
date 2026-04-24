@@ -243,27 +243,26 @@ export class UIFacade {
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
 
-        // 1. Escuchar la actualización de estrellas
-        EventBus.on('updateCoins', (coins: number) => {
+        const updateCoinsHandler = (coins: number) => {
             if (this.coinsText && this.coinsText.active) {
                 this.coinsText.setText(`Estrellas: ${coins}`);
             }
-        });
+        };
 
-        // 2. Escuchar la actualización del tiempo
-        EventBus.on('updateTime', (time: number) => {
+        const updateTimeHandler = (time: number) => {
             if (this.timeText && this.timeText.active) {
-                this.timeText.setText(`Tiempo: ${Math.floor(time)}s`);
+                this.timeText.setText(`Tiempo: ${time}s`);
             }
-        });
+        };
 
-        // 3. Limpiar los fantasmas al reiniciar la escena
+        EventBus.on('updateCoins', updateCoinsHandler, this);
+        EventBus.on('updateTime', updateTimeHandler, this);
+
         this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-            EventBus.off('updateTime');
-            EventBus.off('updateCoins');
+            EventBus.off('updateTime', updateTimeHandler, this);
+            EventBus.off('updateCoins', updateCoinsHandler, this);
         });
     }
-
     public createBottomBar(gameWidth: number, gameHeight: number, barHeight: number) {
         const playableHeight = gameHeight - barHeight;
         const barCenterY = playableHeight + (barHeight / 2);

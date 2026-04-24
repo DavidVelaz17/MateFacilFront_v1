@@ -14,6 +14,9 @@ export class MainScene extends Phaser.Scene {
     private doorStrategy!: MathStrategy;
     private bgMusic!: Phaser.Sound.BaseSound;
 
+    // Variable para guardar la configuración cruda que viene de React
+    private customModeData: any = null;
+
     private levelConfig = {
         targetNumbers: [400, 30],
         solution: 12000,
@@ -24,6 +27,7 @@ export class MainScene extends Phaser.Scene {
     private gameState = {
         collectedNumbers: [] as number[],
         elapsedTime: 0,
+        lastEmittedTime: 0,
         doorFailed: false,
         isGameOver: false
     };
@@ -32,15 +36,22 @@ export class MainScene extends Phaser.Scene {
         super('MainScene');
     }
 
-    init() {
-        this.gameState = {
-            collectedNumbers: [],
-            elapsedTime: 0,
-            doorFailed: false,
-            isGameOver: false
-        };
-    }
+    init(data: any) {
+        this.gameState = { collectedNumbers: [], elapsedTime: 0, lastEmittedTime: 0, doorFailed: false, isGameOver: false };
 
+        if (data && data.config) {
+            this.customModeData = data.config;
+
+            // Convertimos los strings del formulario a números reales para Phaser
+            this.levelConfig.targetNumbers = this.customModeData.cifras.map(Number);
+            this.levelConfig.trapNumbers = this.customModeData.trampas.map(Number);
+            this.levelConfig.solution = Number(this.customModeData.resultado);
+
+            // Calculamos cuántas plataformas necesitamos.
+            // Sumamos los buenos + las trampas + 2 plataformas extra de colchón
+            this.levelConfig.platformCount = this.levelConfig.targetNumbers.length + this.levelConfig.trapNumbers.length + 2;
+        }
+    }
     preload() {
         this.load.image('bg', '/assets/bg.jpg');
         this.load.image('platform', '/assets/platform.png');
@@ -50,7 +61,6 @@ export class MainScene extends Phaser.Scene {
         this.load.spritesheet('axolotl_idle', '/assets/axolote_idle32x32.png', { frameWidth: 32, frameHeight: 32 });
         this.load.spritesheet('axolotl_walking', '/assets/axolote_walking32x32.png', { frameWidth: 32, frameHeight: 32 });
         this.load.image('bar_bg', '/assets/bar_background4.png');
-
         this.load.image('avatar_normal', '/assets/avatar_normal.png');
         this.load.image('avatar_supersad', '/assets/avatar_muytriste.png');
         this.load.image('avatar_superhappy', '/assets/avatar_muyfeliz.png');
@@ -60,8 +70,8 @@ export class MainScene extends Phaser.Scene {
     }
 
     create() {
-        const gameWidth = 800;
-        const gameHeight = 600;
+        const gameWidth = this.scale.width;
+        const gameHeight = this.scale.height;
         const barHeight = 120;
         const playableHeight = gameHeight - barHeight;
 
@@ -77,7 +87,7 @@ export class MainScene extends Phaser.Scene {
 
         const level = builder
             .setPlayableBounds(gameWidth, playableHeight)
-            .addDoor(750, playableHeight - 50)
+            .addDoor(gameWidth - 50, playableHeight - 50)
             .addRandomPlatformsWithItems(this.levelConfig.platformCount, numbersForThisLevel)
             .build();
 
@@ -85,23 +95,36 @@ export class MainScene extends Phaser.Scene {
         this.player.setBounce(0.1).setCollideWorldBounds(true);
 
         this.emotionState = new EmotionContext(this.player, this.ui.getEmotionImageObject());
-
         this.doorStrategy = new MathStrategy(this.levelConfig.targetNumbers);
-
         this.itemsGroup = level.items;
 
         this.physics.add.collider(this.player, level.platforms);
         this.physics.add.collider(level.items, level.platforms);
 
-        //this.physics.add.overlap(this.player, level.items, this.handleItemCollection as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback, undefined, this);
         if (level.door) {
             this.physics.add.overlap(this.player, level.door, this.handleDoorCollision as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback, undefined, this);
         }
 
         this.cursors = this.input.keyboard!.createCursorKeys();
         this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-        this.ui.setEquationText("? x ? = " + this.levelConfig.solution);
+        // 2. CONSTRUIMOS LA ECUACIÓN DINÁMICA DE LA INTERFAZ
+        let equationString = "? x ? = 50"; // Por defecto
 
+        if (this.customModeData) {
+            let symbol = '+';
+            switch(this.customModeData.operation) {
+                case 'suma': symbol = '+'; break;
+                case 'resta': symbol = '-'; break;
+                case 'multiplicacion': symbol = 'x'; break;
+                case 'division': symbol = '÷'; break;
+            }
+
+            // Si son 3 cifras, genera "? + ? + ?", si son 2 genera "? + ?"
+            const questionMarks = Array(this.customModeData.numCifras).fill('?').join(` ${symbol} `);
+            equationString = `${questionMarks} = ${this.levelConfig.solution}`;
+        }
+
+        this.ui.setEquationText(equationString);
         if (!this.anims.exists('idle')) {
             this.anims.create({
                 key: 'idle',
@@ -118,7 +141,6 @@ export class MainScene extends Phaser.Scene {
                 repeat: -1
             });
         }
-
         this.player.play('idle');
 
         this.bgMusic = this.sound.add('bg_music', { volume: 0.3, loop: true });
@@ -128,17 +150,37 @@ export class MainScene extends Phaser.Scene {
     update(_time: number, delta: number) {
         if (!this.gameState.isGameOver) {
             this.gameState.elapsedTime += delta / 1000;
-            EventBus.emit('updateTime', this.gameState.elapsedTime);
+            const currentSecond = Math.floor(this.gameState.elapsedTime);
+
+            // Verificamos si es una "prueba" con tiempo límite
+            if (this.customModeData && this.customModeData.type === 'prueba') {
+                const timeLimit = Number(this.customModeData.timeLimit);
+                const timeLeft = timeLimit - currentSecond;
+
+                // Solo actualizamos la UI cada segundo
+                if (currentSecond > this.gameState.lastEmittedTime) {
+                    EventBus.emit('updateTime', timeLeft > 0 ? timeLeft : 0);
+                    this.gameState.lastEmittedTime = currentSecond;
+                }
+
+                // SI SE ACABA EL TIEMPO:
+                if (timeLeft <= 0) {
+                    this.triggerTimeOut();
+                }
+
+            } else {
+                // Modo Repaso o Historia (Cronómetro normal ascendente)
+                if (currentSecond > this.gameState.lastEmittedTime) {
+                    EventBus.emit('updateTime', currentSecond);
+                    this.gameState.lastEmittedTime = currentSecond;
+                }
+            }
         }
+
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-            this.physics.overlap(
-                this.player,
-                this.itemsGroup,
-                this.handleItemCollection as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
-                undefined,
-                this
-            );
+            this.physics.overlap(this.player, this.itemsGroup, this.handleItemCollection as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback, undefined, this);
         }
+
         const body = this.player.body as Phaser.Physics.Arcade.Body;
         const {left, right, up} = this.cursors;
 
@@ -146,13 +188,11 @@ export class MainScene extends Phaser.Scene {
             this.player.setVelocityX(-160);
             this.player.play('walk', true);
             this.player.setFlipX(true);
-        }
-        else if (right.isDown){
+        } else if (right.isDown){
             this.player.setVelocityX(160);
             this.player.play('walk', true);
             this.player.setFlipX(false);
-        }
-        else {
+        } else {
             this.player.setVelocityX(0);
             this.player.play('idle', true);
         }
@@ -168,13 +208,12 @@ export class MainScene extends Phaser.Scene {
 
         if (numItem.itemType === 'number') {
             this.gameState.collectedNumbers.push(numItem.itemValue);
-
             const isCorrectNumber = this.levelConfig.targetNumbers.includes(numItem.itemValue);
 
             if (!isCorrectNumber) {
                 this.emotionState.transitionTo(new SadState());
                 this.gameState.doorFailed = true;
-            } else {
+            } else if (!this.gameState.doorFailed) {
                 this.emotionState.transitionTo(new HappyState());
             }
             numItem.destroy();
@@ -191,11 +230,12 @@ export class MainScene extends Phaser.Scene {
             this.gameState.isGameOver = true;
             if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop();
             this.physics.pause();
-            this.add.text(400, 300, 'Vuelve a intentarlo', {
+            this.add.text(this.scale.width / 2, this.scale.height / 2, 'Vuelve a intentarlo', {
                 fontSize: '40px', fill: '#f00', stroke: '#000', strokeThickness: 6
             }).setOrigin(0.5);
             return;
         }
+
 
         const canOpen = this.doorStrategy.validate(this.gameState.collectedNumbers);
 
@@ -203,17 +243,28 @@ export class MainScene extends Phaser.Scene {
             this.gameState.isGameOver = true;
             this.emotionState.transitionTo(new SuperHappyState());
             doorSprite.setTexture('door_open');
-            if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop(); // Opcional: Detener música al ganar
+            if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop();
             this.physics.pause();
 
-            this.add.text(400, 300, '¡NIVEL COMPLETADO!', {
+            this.add.text(this.scale.width / 2, this.scale.height / 2, '¡NIVEL COMPLETADO!', {
                 fontSize: '40px', fill: '#0f0', stroke: '#000', strokeThickness: 6
             }).setOrigin(0.5);
-            this.add.text(400, 350, 'Ganaste una estrella', {
+            this.add.text(this.scale.width / 2, (this.scale.height / 2) + 50, 'Ganaste una estrella', {
                 fontSize: '30px', fill: '#ff0', stroke: '#000', strokeThickness: 6
             }).setOrigin(0.5);
 
             EventBus.emit('updateCoins', 1);
         }
+    }
+    private triggerTimeOut() {
+        this.gameState.isGameOver = true;
+        this.emotionState.transitionTo(new SuperSadState());
+
+        if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop();
+        this.physics.pause();
+
+        this.add.text(this.scale.width / 2, this.scale.height / 2, '¡SE ACABÓ EL TIEMPO!', {
+            fontSize: '40px', fill: '#f00', stroke: '#000', strokeThickness: 6
+        }).setOrigin(0.5);
     }
 }
