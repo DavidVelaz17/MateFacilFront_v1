@@ -1,4 +1,21 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
+
+export const MapConfig = {
+    // Coordenadas de los puntos del Mapa Tierra
+    pointDataTierra: [
+        { x: 216, y: 887 }, // Punto 1 (Verde)
+        { x: 493, y: 721 }, // Punto 2 (Púrpura)
+        { x: 301, y: 284 }, // Punto 3 (Amarillo)
+        { x: 914, y: 295 }  // Punto 4 (Rosa)
+    ],
+    // Coordenadas de los puntos del Mapa Agua
+    pointDataAgua: [
+        { x: 137, y: 853 }, // Punto 1 (Verde)
+        { x: 809, y: 818 }, // Punto 2 (Azul claro)
+        { x: 326, y: 310 }, // Punto 3 (Amarillo)
+        { x: 746, y: 280 }  // Punto 4 (Rosa)
+    ]
+};
 
 // ==========================================
 // 1. OBSERVER

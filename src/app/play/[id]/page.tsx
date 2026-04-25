@@ -1,60 +1,58 @@
 "use client";
-import { useParams, useRouter, useSearchParams } from "next/navigation"; // Agregamos useSearchParams
-import { ArrowLeft } from "lucide-react";
-import dynamic from "next/dynamic";
-import { useEffect, useState } from "react"; // Agregamos hooks de React
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+// Importa tu componente PhaserGame (ajusta la ruta según tu proyecto)
+import dynamic from 'next/dynamic';
 
-// IMPORTANTE: Cargamos el componente sin SSR
-const PhaserGame = dynamic(() => import("@/components/PhaserGame"), {
+const PhaserGame = dynamic(() => import('@/components/PhaserGame'), {
     ssr: false,
-    loading: () => <div className="flex items-center justify-center h-full"><p className="text-white text-xl animate-pulse">Cargando motor de juego...</p></div>
+    loading: () => <div className="text-white flex items-center justify-center h-full">Cargando motor de juego...</div>
 });
-
 export default function PlayPage() {
-    const router = useRouter();
-    const params = useParams();
-    const searchParams = useSearchParams(); // Hook para leer la URL
+    const searchParams = useSearchParams();
 
-    // Estado para guardar la configuración si es que existe
-    const [gameConfig, setGameConfig] = useState<any>(null);
+    // 1. DECLARAMOS EL ESTADO PARA GUARDAR LOS DATOS (Inicia en null)
+    const [levelData, setLevelData] = useState<any>(null);
 
     useEffect(() => {
-        // Leemos la URL cuando la página carga
         const mode = searchParams.get('mode');
         const configString = searchParams.get('config');
 
+        // Objeto base que enviaremos a Phaser
+        const initialPhaserData = {
+            mode: mode, // 'historia' o 'custom'
+            config: null as any // Solo se llena si es custom
+        };
+
         if (mode === 'custom' && configString) {
-            try {
-                // Decodificamos el texto de la URL y lo convertimos a un objeto
-                const parsedConfig = JSON.parse(decodeURIComponent(configString));
-                setGameConfig(parsedConfig);
-            } catch (error) {
-                console.error("Error al leer la configuración del nivel:", error);
-            }
+            initialPhaserData.config = JSON.parse(decodeURIComponent(configString));
         }
+
+        // 2. GUARDAMOS EL OBJETO EN EL ESTADO
+        setLevelData(initialPhaserData);
+
     }, [searchParams]);
 
     return (
-        <div className="h-screen w-screen flex flex-col bg-gray-900 overflow-hidden">
-            <div className="p-4 bg-gray-800 text-white flex justify-between items-center shadow-md z-10">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => router.back()} className="hover:bg-gray-700 p-2 rounded-full transition-colors">
-                        <ArrowLeft />
-                    </button>
-                    <h2 className="font-bold text-lg">
-                        Jugando: Alumno ID {params.id}
-                        {searchParams.get('mode') === 'custom' ? ' (Modo Custom)' : ' (Modo Historia)'}
-                    </h2>
-                </div>
+        <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
+
+            {/* Header o botón para regresar al Dashboard */}
+            <div className="w-full max-w-[800px] flex justify-between items-center mb-4 text-white">
+                <h1 className="text-xl font-bold">MateFacil - Zona de Juego</h1>
+                <button
+                    onClick={() => window.history.back()}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition"
+                >
+                    Volver al Panel
+                </button>
             </div>
 
-            <div className="flex-1 flex items-center justify-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-700 to-gray-900">
-                {/* Contenedor donde Phaser buscará el ID "phaser-game" */}
-                <div id="phaser-game" className="relative w-[800px] h-[600px] bg-black border-4 border-gray-600 rounded-lg shadow-2xl overflow-hidden">
-                    {/* Le pasamos la configuración al componente del juego */}
-                    <PhaserGame levelData={gameConfig} />
-                </div>
+            <div className="relative w-[800px] h-[600px] bg-black border-4 border-gray-600 rounded-lg shadow-2xl overflow-hidden">
+                {/* 3. RENDERIZADO CONDICIONAL */}
+                {/* Solo renderizamos el juego cuando levelData ya no es null */}
+                {levelData && <PhaserGame levelData={levelData} />}
             </div>
+
         </div>
     );
 }

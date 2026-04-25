@@ -1,10 +1,10 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import {
     EventBus, MathStrategy, EmotionContext,
     SadState, HappyState, LevelBuilder, UIFacade, NumberItem, SuperHappyState, SuperSadState
 } from './patterns';
 
-export class MainScene extends Phaser.Scene {
+export class GameScene extends Phaser.Scene {
     private player!: Phaser.Physics.Arcade.Sprite;
     private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
     private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -14,14 +14,14 @@ export class MainScene extends Phaser.Scene {
     private doorStrategy!: MathStrategy;
     private bgMusic!: Phaser.Sound.BaseSound;
 
-    // Variable para guardar la configuración cruda que viene de React
-    private customModeData: any = null;
+    private levelData: any = null;
+    private currentElement: 'tierra' | 'agua' = 'tierra';
 
     private levelConfig = {
-        targetNumbers: [400, 30],
-        solution: 12000,
+        targetNumbers: [] as number[],
+        solution: 0,
         platformCount: 7,
-        trapNumbers: [200, 20, 150]
+        trapNumbers: [] as number[]
     };
 
     private gameState = {
@@ -33,40 +33,31 @@ export class MainScene extends Phaser.Scene {
     };
 
     constructor() {
-        super('MainScene');
+        super('GameScene');
     }
 
     init(data: any) {
         this.gameState = { collectedNumbers: [], elapsedTime: 0, lastEmittedTime: 0, doorFailed: false, isGameOver: false };
-
+        console.log("4. GameScene inicializado con:", data);
         if (data && data.config) {
-            this.customModeData = data.config;
+            this.levelData = data.config;
 
-            // Convertimos los strings del formulario a números reales para Phaser
-            this.levelConfig.targetNumbers = this.customModeData.cifras.map(Number);
-            this.levelConfig.trapNumbers = this.customModeData.trampas.map(Number);
-            this.levelConfig.solution = Number(this.customModeData.resultado);
+            // --- CAMBIO 1: Asegurarnos de guardar qué modo de juego es (Historia o Custom) ---
+            if (data.mode) {
+                this.levelData.gameMode = data.mode;
+            }
 
-            // Calculamos cuántas plataformas necesitamos.
-            // Sumamos los buenos + las trampas + 2 plataformas extra de colchón
+            this.currentElement = this.levelData.element || 'tierra';
+
+            const correctos = this.levelData.cifras || [];
+            const trampas = this.levelData.trampas || [];
+
+            this.levelConfig.targetNumbers = correctos.map(Number);
+            this.levelConfig.trapNumbers = trampas.map(Number);
+            this.levelConfig.solution = Number(this.levelData.resultado);
+
             this.levelConfig.platformCount = this.levelConfig.targetNumbers.length + this.levelConfig.trapNumbers.length + 2;
         }
-    }
-    preload() {
-        this.load.image('bg', '/assets/bg.jpg');
-        this.load.image('platform', '/assets/platform.png');
-        this.load.image('door', '/assets/door.png');
-        this.load.image("door_open", "/assets/door_open.png");
-        this.load.image('axolotl', '/assets/axolote_standing.png');
-        this.load.spritesheet('axolotl_idle', '/assets/axolote_idle32x32.png', { frameWidth: 32, frameHeight: 32 });
-        this.load.spritesheet('axolotl_walking', '/assets/axolote_walking32x32.png', { frameWidth: 32, frameHeight: 32 });
-        this.load.image('bar_bg', '/assets/bar_background4.png');
-        this.load.image('avatar_normal', '/assets/avatar_normal.png');
-        this.load.image('avatar_supersad', '/assets/avatar_muytriste.png');
-        this.load.image('avatar_superhappy', '/assets/avatar_muyfeliz.png');
-        this.load.image('avatar_sad', '/assets/avatar_triste.png');
-        this.load.image('avatar_happy', '/assets/avatar_feliz.png');
-        this.load.audio('bg_music', '/assets/bg_sound.mp3');
     }
 
     create() {
@@ -77,7 +68,10 @@ export class MainScene extends Phaser.Scene {
 
         this.physics.world.setBounds(0, 0, gameWidth, playableHeight);
 
-        this.add.image(0, 0, 'bg').setOrigin(0,0).setDisplaySize(gameWidth, playableHeight);
+        const backgroundKey = this.currentElement === 'agua' ? 'bg_agua' : 'bg_tierra';
+        this.add.image(0, 0, backgroundKey)
+            .setOrigin(0,0)
+            .setDisplaySize(gameWidth, playableHeight);
 
         this.ui = new UIFacade(this);
         this.ui.createBottomBar(gameWidth, gameHeight, barHeight);
@@ -107,41 +101,48 @@ export class MainScene extends Phaser.Scene {
 
         this.cursors = this.input.keyboard!.createCursorKeys();
         this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-        // 2. CONSTRUIMOS LA ECUACIÓN DINÁMICA DE LA INTERFAZ
-        let equationString = "? x ? = 50"; // Por defecto
 
-        if (this.customModeData) {
+        let equationString = "? x ? = ?";
+
+        if (this.levelData) {
             let symbol = '+';
-            switch(this.customModeData.operation) {
+            switch(this.levelData.operation) {
                 case 'suma': symbol = '+'; break;
                 case 'resta': symbol = '-'; break;
                 case 'multiplicacion': symbol = 'x'; break;
                 case 'division': symbol = '÷'; break;
             }
 
-            // Si son 3 cifras, genera "? + ? + ?", si son 2 genera "? + ?"
-            const questionMarks = Array(this.customModeData.numCifras).fill('?').join(` ${symbol} `);
+            const numCifras = this.levelData.numCifras || this.levelConfig.targetNumbers.length;
+            const questionMarks = Array(numCifras).fill('?').join(` ${symbol} `);
             equationString = `${questionMarks} = ${this.levelConfig.solution}`;
         }
 
         this.ui.setEquationText(equationString);
-        if (!this.anims.exists('idle')) {
-            this.anims.create({
-                key: 'idle',
-                frames: this.anims.generateFrameNumbers('axolotl_idle', { start: 0, end: 3 }),
-                frameRate: 5,
-                repeat: -1
-            });
+
+        if (this.textures.exists('axolotl_idle') && this.textures.exists('axolotl_walking')) {
+            if (!this.anims.exists('idle')) {
+                this.anims.create({
+                    key: 'idle',
+                    frames: this.anims.generateFrameNumbers('axolotl_idle', { start: 0, end: 3 }),
+                    frameRate: 5,
+                    repeat: -1
+                });
+            }
+            if (!this.anims.exists('walk')) {
+                this.anims.create({
+                    key: 'walk',
+                    frames: this.anims.generateFrameNumbers('axolotl_walking', { start: 0, end: 3 }),
+                    frameRate: 7,
+                    repeat: -1
+                });
         }
-        if (!this.anims.exists('walk')) {
-            this.anims.create({
-                key: 'walk',
-                frames: this.anims.generateFrameNumbers('axolotl_walking', { start: 0, end: 3 }),
-                frameRate: 7,
-                repeat: -1
-            });
+            if (this.anims.exists('idle')) {
+                this.player.play('idle');
+            }
+        } else {
+            console.warn("Texturas del Axolote no encontradas. Saltando animaciones.");
         }
-        this.player.play('idle');
 
         this.bgMusic = this.sound.add('bg_music', { volume: 0.3, loop: true });
         this.bgMusic.play();
@@ -152,24 +153,19 @@ export class MainScene extends Phaser.Scene {
             this.gameState.elapsedTime += delta / 1000;
             const currentSecond = Math.floor(this.gameState.elapsedTime);
 
-            // Verificamos si es una "prueba" con tiempo límite
-            if (this.customModeData && this.customModeData.type === 'prueba') {
-                const timeLimit = Number(this.customModeData.timeLimit);
+            if (this.levelData && this.levelData.type === 'prueba') {
+                const timeLimit = Number(this.levelData.timeLimit);
                 const timeLeft = timeLimit - currentSecond;
 
-                // Solo actualizamos la UI cada segundo
                 if (currentSecond > this.gameState.lastEmittedTime) {
                     EventBus.emit('updateTime', timeLeft > 0 ? timeLeft : 0);
                     this.gameState.lastEmittedTime = currentSecond;
                 }
 
-                // SI SE ACABA EL TIEMPO:
                 if (timeLeft <= 0) {
                     this.triggerTimeOut();
                 }
-
             } else {
-                // Modo Repaso o Historia (Cronómetro normal ascendente)
                 if (currentSecond > this.gameState.lastEmittedTime) {
                     EventBus.emit('updateTime', currentSecond);
                     this.gameState.lastEmittedTime = currentSecond;
@@ -233,9 +229,11 @@ export class MainScene extends Phaser.Scene {
             this.add.text(this.scale.width / 2, this.scale.height / 2, 'Vuelve a intentarlo', {
                 fontSize: '40px', fill: '#f00', stroke: '#000', strokeThickness: 6
             }).setOrigin(0.5);
+
+            // --- CAMBIO 2: Lógica de salida al Perder ---
+            this.exitScene(false);
             return;
         }
-
 
         const canOpen = this.doorStrategy.validate(this.gameState.collectedNumbers);
 
@@ -254,8 +252,12 @@ export class MainScene extends Phaser.Scene {
             }).setOrigin(0.5);
 
             EventBus.emit('updateCoins', 1);
+
+            // --- CAMBIO 3: Lógica de salida al Ganar ---
+            this.exitScene(true);
         }
     }
+
     private triggerTimeOut() {
         this.gameState.isGameOver = true;
         this.emotionState.transitionTo(new SuperSadState());
@@ -266,5 +268,21 @@ export class MainScene extends Phaser.Scene {
         this.add.text(this.scale.width / 2, this.scale.height / 2, '¡SE ACABÓ EL TIEMPO!', {
             fontSize: '40px', fill: '#f00', stroke: '#000', strokeThickness: 6
         }).setOrigin(0.5);
+
+        // --- CAMBIO 4: Lógica de salida por Tiempo ---
+        this.exitScene(false);
+    }
+
+    // --- NUEVO MÉTODO CENTRALIZADO DE SALIDA ---
+    private exitScene(isWin: boolean) {
+        // Esperamos 3 segundos para que el niño pueda leer el mensaje final
+        this.time.delayedCall(3000, () => {
+            if (this.levelData && this.levelData.gameMode === 'historia') {
+                // Si es Modo Historia, regresamos al mapa (el mapa avanza al mono si win es true)
+                this.scene.start('MapScene', { win: isWin });
+            }
+            // Si es Modo Custom, el juego simplemente se queda en pausa.
+            // El maestro puede ver la pantalla final y presionar la flecha de regresar en React.
+        });
     }
 }
