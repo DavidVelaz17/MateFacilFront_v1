@@ -7,7 +7,6 @@ export class PreloadScene extends Phaser.Scene{
     }
 
     init(data: any) {
-        // Atrapamos los datos antes de cargar nada
         this.initData = data;
     }
 
@@ -23,14 +22,16 @@ export class PreloadScene extends Phaser.Scene{
         this.load.image('mapa_tierra', '/assets/mapa_tierra.png');
 
         //FONDOS
-        this.load.image('bg_agua', '/assets/bg_agua.jpg');
+        this.load.image('bg_agua', '/assets/bg_agua.png');
         this.load.image('bg_tierra', '/assets/bg_tierra.jpg');
 
         //ELEMENTOS DEL MAPA
-        this.load.image('platform', '/assets/platform.png');
+        this.load.image('platform_tierra', '/assets/platform_tierra.png');
+        this.load.image('platform_agua', '/assets/platform_agua.png');
         this.load.image('door', '/assets/door.png');
         this.load.image("door_open", "/assets/door_open.png");
-        this.load.image('bar_bg', '/assets/bar_background4.png');
+        this.load.image('bar_bg_tierra', '/assets/bar_background_tierra.png');
+        this.load.image('bar_bg_agua', '/assets/bar_background_agua.png');
 
         //PERSONAJE
         this.load.image('axolotl', '/assets/axolote_standing.png');
@@ -53,7 +54,6 @@ export class PreloadScene extends Phaser.Scene{
         });
     }
     create() {
-        // Marcamos en el registro global que ya cargamos todo
         this.game.registry.set('assetsLoaded', true);
 
         console.log("Preload terminado. Yendo a BootScene con:", this.initData);

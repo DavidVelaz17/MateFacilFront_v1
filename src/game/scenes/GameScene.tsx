@@ -42,7 +42,6 @@ export class GameScene extends Phaser.Scene {
         if (data && data.config) {
             this.levelData = data.config;
 
-            // --- CAMBIO 1: Asegurarnos de guardar qué modo de juego es (Historia o Custom) ---
             if (data.mode) {
                 this.levelData.gameMode = data.mode;
             }
@@ -69,12 +68,14 @@ export class GameScene extends Phaser.Scene {
         this.physics.world.setBounds(0, 0, gameWidth, playableHeight);
 
         const backgroundKey = this.currentElement === 'agua' ? 'bg_agua' : 'bg_tierra';
+        const barBgKey = this.currentElement === 'agua' ? 'bar_bg_agua' : 'bar_bg_tierra';
+        const platformKey = this.currentElement === 'agua' ? 'platform_agua' : 'platform_tierra';
         this.add.image(0, 0, backgroundKey)
             .setOrigin(0,0)
             .setDisplaySize(gameWidth, playableHeight);
 
         this.ui = new UIFacade(this);
-        this.ui.createBottomBar(gameWidth, gameHeight, barHeight);
+        this.ui.createBottomBar(gameWidth, gameHeight, barHeight, barBgKey);
 
         const builder = new LevelBuilder(this);
         const numbersForThisLevel = [...this.levelConfig.targetNumbers, ...this.levelConfig.trapNumbers];
@@ -82,7 +83,7 @@ export class GameScene extends Phaser.Scene {
         const level = builder
             .setPlayableBounds(gameWidth, playableHeight)
             .addDoor(gameWidth - 50, playableHeight - 50)
-            .addRandomPlatformsWithItems(this.levelConfig.platformCount, numbersForThisLevel)
+            .addRandomPlatformsWithItems(this.levelConfig.platformCount, numbersForThisLevel, platformKey)
             .build();
 
         this.player = this.physics.add.sprite(50, playableHeight - 50, 'axolotl_idle').setScale(1.5);
@@ -96,7 +97,10 @@ export class GameScene extends Phaser.Scene {
         this.physics.add.collider(level.items, level.platforms);
 
         if (level.door) {
-            this.physics.add.overlap(this.player, level.door, this.handleDoorCollision as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback, undefined, this);
+            this.physics.add.overlap(this.player, level.door,
+                this.handleDoorCollision as
+                    Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
+                undefined, this);
         }
 
         this.cursors = this.input.keyboard!.createCursorKeys();
@@ -174,7 +178,10 @@ export class GameScene extends Phaser.Scene {
         }
 
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-            this.physics.overlap(this.player, this.itemsGroup, this.handleItemCollection as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback, undefined, this);
+            this.physics.overlap(this.player, this.itemsGroup,
+                this.handleItemCollection as
+                    Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
+                undefined, this);
         }
 
         const body = this.player.body as Phaser.Physics.Arcade.Body;
@@ -252,8 +259,6 @@ export class GameScene extends Phaser.Scene {
             }).setOrigin(0.5);
 
             EventBus.emit('updateCoins', 1);
-
-            // --- CAMBIO 3: Lógica de salida al Ganar ---
             this.exitScene(true);
         }
     }
@@ -269,20 +274,14 @@ export class GameScene extends Phaser.Scene {
             fontSize: '40px', fill: '#f00', stroke: '#000', strokeThickness: 6
         }).setOrigin(0.5);
 
-        // --- CAMBIO 4: Lógica de salida por Tiempo ---
         this.exitScene(false);
     }
 
-    // --- NUEVO MÉTODO CENTRALIZADO DE SALIDA ---
     private exitScene(isWin: boolean) {
-        // Esperamos 3 segundos para que el niño pueda leer el mensaje final
         this.time.delayedCall(3000, () => {
             if (this.levelData && this.levelData.gameMode === 'historia') {
-                // Si es Modo Historia, regresamos al mapa (el mapa avanza al mono si win es true)
                 this.scene.start('MapScene', { win: isWin });
             }
-            // Si es Modo Custom, el juego simplemente se queda en pausa.
-            // El maestro puede ver la pantalla final y presionar la flecha de regresar en React.
         });
     }
 }

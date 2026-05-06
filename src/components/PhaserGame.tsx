@@ -23,7 +23,6 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
             const { MapScene } = await import('@/game/scenes/MapScene');
             const { GameScene } = await import('@/game/scenes/GameScene');
 
-            // 1. CONFIGURACIÓN LIMPIA (Sin array de escenas)
             const config: PhaserType.Types.Core.GameConfig = {
                 type: Phaser.AUTO,
                 parent: containerRef.current,
@@ -34,21 +33,16 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                     arcade: { gravity: { y: 800 }, debug: false }
                 },
                 transparent: true
-                // IMPORTANTE: Quitamos "scene: [...]" para que no arranque sola
             };
 
-            // 2. INICIALIZACIÓN CONTROLADA
             if (!gameRef.current) {
                 gameRef.current = new Phaser.Game(config);
-
-                // Agregamos las escenas manualmente "apagadas"
                 gameRef.current.scene.add('PreloadScene', PreloadScene);
                 gameRef.current.scene.add('BootScene', BootScene);
                 gameRef.current.scene.add('MainMenuScene', MainMenuScene);
                 gameRef.current.scene.add('MapScene', MapScene);
                 gameRef.current.scene.add('GameScene', GameScene);
 
-                // Le damos un respiro al motor y arrancamos la primera escena CON los datos
                 setTimeout(() => {
                     if (gameRef.current) {
                         console.log("React: Arrancando motor con datos ->", levelData);
@@ -56,15 +50,10 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                     }
                 }, 100);
             }
-            // 3. SI EL MAESTRO CAMBIA LOS DATOS EN TIEMPO REAL
             else if (levelData) {
                 console.log("React: Reiniciando motor por nuevos datos ->", levelData);
                 const sceneManager = gameRef.current.scene;
-
-                // Apagamos cualquier escena que esté corriendo
                 sceneManager.getScenes(true).forEach(scene => scene.scene.stop());
-
-                // Volvemos a empezar desde el Preload
                 sceneManager.start('PreloadScene', { config: levelData });
             }
         };
@@ -72,8 +61,6 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
         if (typeof window !== 'undefined') {
             initPhaser();
         }
-
-        // Limpieza cuando el componente se desmonta (al salir de la página)
         return () => {
             if (gameRef.current) {
                 gameRef.current.destroy(true);

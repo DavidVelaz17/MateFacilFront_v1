@@ -42,13 +42,11 @@ export class MathStrategy {
 // 3. STATE
 // ==========================================
 export interface EmotionState {
-    // --- ACTUALIZADO: toma una imagen de la interfaz en vez de un texto ---
     apply(player: Phaser.GameObjects.Sprite, uiEmotionImage: Phaser.GameObjects.Image): void;
 }
 
 export class EmotionContext {
     private player: Phaser.GameObjects.Sprite;
-    // --- CAMBIADO DE TEXT A IMAGE PARA LA INTERFAZ ---
     private uiEmotionImage: Phaser.GameObjects.Image;
     private state!: EmotionState;
 
@@ -60,7 +58,6 @@ export class EmotionContext {
 
     transitionTo(state: EmotionState) {
         this.state = state;
-        // --- LLAMADA ACTUALIZADA ---
         this.state.apply(this.player, this.uiEmotionImage);
     }
 }
@@ -68,33 +65,28 @@ export class EmotionContext {
 class NormalState implements EmotionState {
     apply(player: Phaser.GameObjects.Sprite, uiEmotionImage: Phaser.GameObjects.Image) {
         player.clearTint();
-        // --- CAMBIA LA TEXTURA DE LA IMAGEN EN LA INTERFAZ DE USUARIO ---
         uiEmotionImage.setTexture('avatar_normal');
     }
 }
 
 export class SadState implements EmotionState {
     apply(player: Phaser.GameObjects.Sprite, uiEmotionImage: Phaser.GameObjects.Image) {
-        // --- CAMBIA LA TEXTURA DE LA IMAGEN EN LA INTERFAZ DE USUARIO ---
         uiEmotionImage.setTexture('avatar_sad');
     }
 }
 
 export class HappyState implements EmotionState {
     apply(player: Phaser.GameObjects.Sprite, uiEmotionImage: Phaser.GameObjects.Image) {
-        // --- CAMBIA LA TEXTURA DE LA IMAGEN EN LA INTERFAZ DE USUARIO ---
         uiEmotionImage.setTexture('avatar_happy');
     }
 }
 export class SuperHappyState implements EmotionState {
     apply(player: Phaser.GameObjects.Sprite, uiEmotionImage: Phaser.GameObjects.Image) {
-        // --- CAMBIA LA TEXTURA DE LA IMAGEN EN LA INTERFAZ DE USUARIO ---
         uiEmotionImage.setTexture('avatar_superhappy');
     }
 }
 export class SuperSadState implements EmotionState {
     apply(player: Phaser.GameObjects.Sprite, uiEmotionImage: Phaser.GameObjects.Image) {
-        // --- CAMBIA LA TEXTURA DE LA IMAGEN EN LA INTERFAZ DE USUARIO ---
         uiEmotionImage.setTexture('avatar_supersad');
     }
 }
@@ -102,7 +94,6 @@ export class SuperSadState implements EmotionState {
 // ==========================================
 // 4. FACTORY METHOD
 // ==========================================
-// Extendemos el tipo Text de Phaser para agregarle nuestras propiedades custom
 export interface NumberItem extends Phaser.GameObjects.Text {
     itemValue: number;
     itemType: string;
@@ -144,8 +135,8 @@ export class LevelBuilder {
         this.scene.physics.world.setBounds(0, 0, width, height);
         return this;
     }
-    addPlatform(x: number, y: number) {
-        const platform = this.platforms.create(x, y, 'platform') as Phaser.Physics.Arcade.Sprite;
+    addPlatform(x: number, y: number,platformKey:any) {
+        const platform = this.platforms.create(x, y, platformKey) as Phaser.Physics.Arcade.Sprite;
         platform.setScale(0.1);
         platform.refreshBody();
         return this;
@@ -162,25 +153,21 @@ export class LevelBuilder {
         return this;
     }
 
-    addRandomPlatformsWithItems(platformCount: number, itemsToPlace: number[]) {
-        // Ajusta estas medidas según el tamaño real de tu imagen 'platform.png'
-        const texture = this.scene.textures.get('platform').getSourceImage();
+    addRandomPlatformsWithItems(platformCount: number, itemsToPlace: number[], platformKey: any) {
+        const texture = this.scene.textures.get(platformKey).getSourceImage();
         const scale = 0.1;
         const pWidth = texture.width * scale;
         const pHeight = texture.height * scale;
-        // Padding: Cuánto espacio extra dejamos entre plataformas para que el axolote pueda pasar
         const paddingX = 60;
         const paddingY = 80;
         const maxJumpDistanceX = 200; // Distancia máxima horizontal segura
         const maxJumpDistanceY = 160; // Altura máxima vertical segura
 
         const startY = this.boundsHeight - 120;
-        // Guardamos las coordenadas de las plataformas que vamos validando
         const placedPositions: {x: number, y: number}[] = [
             { x: 100, y: startY}
         ];
 
-        // Hacemos una copia del arreglo de ítems para ir sacándolos
         const itemsQueue = [...itemsToPlace];
 
         for (let i = 0; i < platformCount; i++) {
@@ -189,19 +176,15 @@ export class LevelBuilder {
             let randX = 0;
             let randY = 0;
 
-            // Intentamos hasta 100 veces encontrar un hueco libre para cada plataforma
             while (!isValid && attempts < 150) {
-                // Generar posición aleatoria (evitando los bordes de la pantalla)
                 randX = Phaser.Math.Between(pWidth, this.boundsWidth - pWidth);
                 randY = Phaser.Math.Between(100, this.boundsHeight - 140);
 
-                // 1. Evitar que se generen encima del jugador (Inicio) o la puerta (Final)
                 const isNearStart = randX < 150 && randY > this.boundsHeight - 150;
                 const isNearDoor = randX > this.boundsWidth - 250 && randY > this.boundsHeight - 250;
 
                 isValid = !isNearStart && !isNearDoor;
 
-                // 2. Comprobar que no choque con plataformas ya colocadas
                 if (isValid) {
                     let isReachable = false;
                     let isOverlapping = false;
@@ -210,7 +193,6 @@ export class LevelBuilder {
                         const distanceY = pos.y - randY;
                         const absoluteDistY = Math.abs(distanceY);
 
-                        // Si la distancia horizontal Y vertical es menor al tamaño + padding, colisionan
                         if (distanceX < (pWidth + paddingX) && absoluteDistY < (pHeight + paddingY)) {
                             isOverlapping = true;
                             break; // Dejamos de revisar, ya sabemos que no cabe
@@ -224,14 +206,10 @@ export class LevelBuilder {
                 attempts++;
             }
 
-            // Si después de los intentos encontramos un lugar válido...
             if (isValid) {
-                // La dibujamos físicamente
-                this.addPlatform(randX, randY);
-                // Guardamos sus coordenadas para que las siguientes no choquen con esta
+                this.addPlatform(randX, randY,platformKey);
                 placedPositions.push({ x: randX, y: randY });
 
-                // ¿Quedan números por colocar? Lo ponemos 40 píxeles por encima de esta plataforma
                 if (itemsQueue.length > 0) {
                     const numberValue = itemsQueue.pop()!;
                     this.addNumberItem(randX, randY - 50, numberValue);
@@ -280,12 +258,12 @@ export class UIFacade {
             EventBus.off('updateCoins', updateCoinsHandler, this);
         });
     }
-    public createBottomBar(gameWidth: number, gameHeight: number, barHeight: number) {
+    public createBottomBar(gameWidth: number, gameHeight: number, barHeight: number, barBgKey: any) {
         const playableHeight = gameHeight - barHeight;
         const barCenterY = playableHeight + (barHeight / 2);
 
         // --- FONDO DE LA BARRA ---
-        this.scene.add.image(gameWidth / 2, barCenterY, 'bar_bg')
+        this.scene.add.image(gameWidth / 2, barCenterY, barBgKey)
             .setDisplaySize(gameWidth, barHeight)
             .setDepth(100);
 
