@@ -8,6 +8,7 @@ export class MapScene extends Phaser.Scene {
     private currentElement: 'tierra' | 'agua' = 'tierra';
     private playerNode: Phaser.GameObjects.Arc | null = null;
     private playerAvatar: Phaser.GameObjects.Sprite | null = null;
+    private justWon: boolean = false;
 
     constructor() {
         super('MapScene');
@@ -16,8 +17,9 @@ export class MapScene extends Phaser.Scene {
     init(data: any) {
         if (data && data.config) {
             this.levelData = data.config;
-            this.currentElement = data.config.selectedElement || 'tierra';
+            this.currentElement = data.config.element || data.config.selectedElement || 'tierra';
         }
+        this.justWon = data && data.win ? true : false;
     }
 
     create() {
@@ -39,29 +41,44 @@ export class MapScene extends Phaser.Scene {
 
         if (currentPointIndex < pointData.length) {
             const currentPoint = pointData[currentPointIndex];
-            this.playerAvatar = this.physics.add.sprite(currentPoint.x, currentPoint.y, 'axolotl_idle').setScale(1.5).refreshBody();
+            this.playerAvatar = this.add.sprite(currentPoint.x, currentPoint.y, 'axolotl_idle').setScale(1.5).setDepth(100);
+            if (!this.anims.exists('idle_map')) {
+                this.anims.create({
+                    key: 'idle_map',
+                    frames: this.anims.generateFrameNumbers('axolotl_idle', { start: 0, end: 3 }),
+                    frameRate: 5,
+                    repeat: -1
+                });
+            }
+            this.playerAvatar.play('idle_map');
         }
 
-        const playButton = this.add.text(width / 2, height / 2, 'JUGAR', {
-            fontSize: '32px',
-            backgroundColor: '#4C1D95',
-            padding: { x: 20, y: 10 },
-            color: '#FFF',
-            stroke: '#000',
-            strokeThickness: 4
-        }).setOrigin(0.5,-4).setInteractive();
-
-        playButton.on('pointerover', () => playButton.setStyle({ backgroundColor: '#6D28D9' }));
-        playButton.on('pointerout', () => playButton.setStyle({ backgroundColor: '#4C1D95' }));
+        const playButton = this.add.image(width / 2, height / 2, 'btn_jugar_0')
+            .setOrigin(-2.8,-4.5).setInteractive();
+        playButton.on('pointerover', () => playButton.setTexture('btn_jugar_1' ));
+        playButton.on('pointerout', () => playButton.setTexture('btn_jugar_0' ));
         playButton.on('pointerdown', () => {
             const finalLevelData = this.prepareLevelData(currentPointIndex);
-            this.scene.start('GameScene', { config: finalLevelData });
+            this.scene.start('GameScene', { config: finalLevelData, mode: 'historia' });
         });
-        this.events.once(Phaser.Scenes.Events.WAKE, (sys, data) => {
-            if (data && data.win) {
+
+        const returnButton = this.add.image(width / 2, height / 2, 'btn_menu_0')
+            .setOrigin(4,5.8).setInteractive();
+
+        returnButton.on('pointerover', () => returnButton.setTexture('btn_menu_1'));
+        returnButton.on('pointerout', () => returnButton.setTexture('btn_menu_0'));
+        returnButton.on('pointerdown', () => {
+            const finalLevelData = this.prepareLevelData(currentPointIndex);
+            this.scene.start('MainMenuScene', { config: finalLevelData, mode: 'historia' });
+        });
+
+
+        if (this.justWon) {
+            this.justWon = false;
+            this.time.delayedCall(500, () => {
                 this.advancePlayerCharacter();
-            }
-        }, this);
+            });
+        }
     }
 
     private prepareLevelData(currentPointIndex: number): any {
@@ -99,13 +116,18 @@ export class MapScene extends Phaser.Scene {
 
     private advancePlayerCharacter() {
         const pointData = this.currentElement === 'tierra' ? MapConfig.pointDataTierra : MapConfig.pointDataAgua;
-        let currentPointIndex = this.currentElement === 'tierra' ? MapScene.currentLevelPointTierra : MapScene.currentLevelPointAgua;
+        const currentPointIndex = this.currentElement === 'tierra' ? MapScene.currentLevelPointTierra : MapScene.currentLevelPointAgua;
 
         if (currentPointIndex < pointData.length - 1) {
-            if (this.currentElement === 'tierra') MapScene.currentLevelPointTierra++;
-            else MapScene.currentLevelPointAgua++;
+            if (this.currentElement === 'tierra') {
+                MapScene.currentLevelPointTierra++;
+            } else {
+                MapScene.currentLevelPointAgua++;
+            }
+
             const nextPointIndex = currentPointIndex + 1;
             const nextPoint = pointData[nextPointIndex];
+
             this.tweens.add({
                 targets: this.playerAvatar,
                 x: nextPoint.x,

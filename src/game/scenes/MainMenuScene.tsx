@@ -39,12 +39,12 @@ export class MainMenuScene extends Phaser.Scene {
             this.handleSelection('agua', 'mult_div');
         });
 
-        this.add.text(width / 2, height - 20, '¡Selecciona tu Mundo para Jugar!', {
+        this.add.text(width / 2, height - 20, '¡Selecciona el mundo para Jugar!', {
             fontSize: '18px',
             color: '#FFF',
             stroke: '#000',
             strokeThickness: 3
-        }).setOrigin(0.5);
+        }).setOrigin(0.5,27);
     }
 
     private handleSelection(element: 'tierra' | 'agua', operationGroup: string) {

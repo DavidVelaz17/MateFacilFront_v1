@@ -719,15 +719,15 @@ export default function Dashboard() {
                                         <div className="p-4 bg-red-50 rounded-xl border border-red-100">
                                             <div className="flex justify-between items-center mb-3">
                                                 <label className="text-sm font-semibold text-red-700">
-                                                    Cantidad de números trampa (Máximo 10):
+                                                    Cantidad de números trampa (Máximo 4):
                                                 </label>
                                                 <input
-                                                    type="number" min="0" max="10" required
+                                                    type="number" min="0" max="4" required
                                                     value={gameConfig.numTrampas}
                                                     onChange={(e) => {
                                                         const num = parseInt(e.target.value) || 0;
-                                                        // Validamos el límite de 10 para CUALQUIER elemento
-                                                        const finalNum = num > 10 ? 10 : num;
+                                                        // Validamos el límite de 4 para CUALQUIER elemento
+                                                        const finalNum = num > 4 ? 4 : num;
 
                                                         setGameConfig({...gameConfig, numTrampas: finalNum, trampas: Array(finalNum).fill('')});
                                                     }}

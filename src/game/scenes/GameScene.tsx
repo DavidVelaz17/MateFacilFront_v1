@@ -29,7 +29,9 @@ export class GameScene extends Phaser.Scene {
         elapsedTime: 0,
         lastEmittedTime: 0,
         doorFailed: false,
-        isGameOver: false
+        isGameOver: false,
+        isPaused: false,
+        lives: 3
     };
 
     constructor() {
@@ -37,7 +39,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     init(data: any) {
-        this.gameState = { collectedNumbers: [], elapsedTime: 0, lastEmittedTime: 0, doorFailed: false, isGameOver: false };
+        const startingLives = data && data.lives !== undefined ? data.lives : 3;
+        this.gameState = { collectedNumbers: [], elapsedTime: 0, lastEmittedTime: 0, doorFailed: false,
+            isGameOver: false, isPaused: false, lives: startingLives };
         console.log("4. GameScene inicializado con:", data);
         if (data && data.config) {
             this.levelData = data.config;
@@ -75,7 +79,8 @@ export class GameScene extends Phaser.Scene {
             .setDisplaySize(gameWidth, playableHeight);
 
         this.ui = new UIFacade(this);
-        this.ui.createBottomBar(gameWidth, gameHeight, barHeight, barBgKey);
+        this.ui.createBottomBar(gameWidth, gameHeight, barHeight, barBgKey,this.gameState.lives);
+        this.ui.createControlButtons(gameWidth);
 
         const builder = new LevelBuilder(this);
         const numbersForThisLevel = [...this.levelConfig.targetNumbers, ...this.levelConfig.trapNumbers];
@@ -150,32 +155,49 @@ export class GameScene extends Phaser.Scene {
 
         this.bgMusic = this.sound.add('bg_music', { volume: 0.3, loop: true });
         this.bgMusic.play();
+
+        EventBus.on('togglePause', (paused: boolean) => {
+            this.gameState.isPaused = paused;
+            if (paused) {
+                this.physics.pause();
+                this.player.anims.pause();
+            } else {
+                this.physics.resume();
+                this.player.anims.resume();
+            }
+        }, this);
+
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            EventBus.off('togglePause');
+            EventBus.off('restartGame');
+        });
     }
 
     update(_time: number, delta: number) {
-        if (!this.gameState.isGameOver) {
-            this.gameState.elapsedTime += delta / 1000;
-            const currentSecond = Math.floor(this.gameState.elapsedTime);
+        if (this.gameState.isGameOver|| this.gameState.isPaused)
+            return;
+        this.gameState.elapsedTime += delta / 1000;
+        const currentSecond = Math.floor(this.gameState.elapsedTime);
 
-            if (this.levelData && this.levelData.type === 'prueba') {
-                const timeLimit = Number(this.levelData.timeLimit);
-                const timeLeft = timeLimit - currentSecond;
+        if (this.levelData && this.levelData.type === 'prueba') {
+            const timeLimit = Number(this.levelData.timeLimit);
+            const timeLeft = timeLimit - currentSecond;
 
-                if (currentSecond > this.gameState.lastEmittedTime) {
-                    EventBus.emit('updateTime', timeLeft > 0 ? timeLeft : 0);
-                    this.gameState.lastEmittedTime = currentSecond;
-                }
+            if (currentSecond > this.gameState.lastEmittedTime) {
+                EventBus.emit('updateTime', timeLeft > 0 ? timeLeft : 0);
+                this.gameState.lastEmittedTime = currentSecond;
+            }
 
-                if (timeLeft <= 0) {
-                    this.triggerTimeOut();
-                }
-            } else {
-                if (currentSecond > this.gameState.lastEmittedTime) {
-                    EventBus.emit('updateTime', currentSecond);
-                    this.gameState.lastEmittedTime = currentSecond;
-                }
+            if (timeLeft <= 0) {
+                this.triggerLoss('SE ACABÓ EL TIEMPO');
+            }
+        } else {
+            if (currentSecond > this.gameState.lastEmittedTime) {
+                EventBus.emit('updateTime', currentSecond);
+                this.gameState.lastEmittedTime = currentSecond;
             }
         }
+
 
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
             this.physics.overlap(this.player, this.itemsGroup,
@@ -207,6 +229,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     private handleItemCollection(player: Phaser.GameObjects.GameObject, item: Phaser.GameObjects.GameObject) {
+        const limit = this.levelConfig.targetNumbers.length;
+        if (this.gameState.collectedNumbers.length >= limit) {
+            return;
+        }
+
         const numItem = item as NumberItem;
 
         if (numItem.itemType === 'number') {
@@ -222,66 +249,92 @@ export class GameScene extends Phaser.Scene {
             numItem.destroy();
         }
     }
-
     private handleDoorCollision(player: Phaser.GameObjects.GameObject, door: Phaser.GameObjects.GameObject) {
         if (this.gameState.isGameOver) return;
 
         const doorSprite = door as Phaser.Physics.Arcade.Sprite;
 
-        if (this.gameState.doorFailed) {
-            this.emotionState.transitionTo(new SuperSadState());
-            this.gameState.isGameOver = true;
-            if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop();
-            this.physics.pause();
-            this.add.text(this.scale.width / 2, this.scale.height / 2, 'Vuelve a intentarlo', {
-                fontSize: '40px', fill: '#f00', stroke: '#000', strokeThickness: 6
-            }).setOrigin(0.5);
+        const canOpen = this.doorStrategy.validate(this.gameState.collectedNumbers) && !this.gameState.doorFailed;
 
-            // --- CAMBIO 2: Lógica de salida al Perder ---
-            this.exitScene(false);
+        if (!canOpen) {
+            this.gameState.lives--;
+            EventBus.emit('updateLives', this.gameState.lives);
+
+            if (this.gameState.lives > 0) {
+                this.gameState.isGameOver = true;
+                this.emotionState.transitionTo(new SuperSadState());
+                if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop();
+                this.physics.pause();
+
+                this.add.text(this.scale.width / 2, this.scale.height / 2, 'Vuelve a intentarlo', {
+                    fontSize: '40px', fill: '#ff0', stroke: '#000', strokeThickness: 6
+                }).setOrigin(0.5);
+
+                this.createEndButton('Siguiente Intento', () => {
+                    this.scene.restart({ config: this.levelData, lives: this.gameState.lives });
+                });
+            } else {
+                // Perdio su ultima oportunidad
+                this.triggerLoss('TE QUEDASTE SIN VIDAS');
+            }
             return;
         }
 
-        const canOpen = this.doorStrategy.validate(this.gameState.collectedNumbers);
+        // Logica de victoria
+        this.gameState.isGameOver = true;
+        this.emotionState.transitionTo(new SuperHappyState());
+        doorSprite.setTexture('door_open');
+        if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop();
+        this.physics.pause();
 
-        if (canOpen) {
-            this.gameState.isGameOver = true;
-            this.emotionState.transitionTo(new SuperHappyState());
-            doorSprite.setTexture('door_open');
-            if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop();
-            this.physics.pause();
+        const estrellasObtenidas = this.gameState.lives;
+        const textoEstrellas = estrellasObtenidas === 1 ? 'estrella' : 'estrellas';
 
-            this.add.text(this.scale.width / 2, this.scale.height / 2, '¡NIVEL COMPLETADO!', {
-                fontSize: '40px', fill: '#0f0', stroke: '#000', strokeThickness: 6
-            }).setOrigin(0.5);
-            this.add.text(this.scale.width / 2, (this.scale.height / 2) + 50, 'Ganaste una estrella', {
-                fontSize: '30px', fill: '#ff0', stroke: '#000', strokeThickness: 6
-            }).setOrigin(0.5);
+        this.add.text(this.scale.width / 2, this.scale.height / 2, 'NIVEL COMPLETADO', {
+            fontSize: '40px', fill: '#0f0', stroke: '#000', strokeThickness: 6
+        }).setOrigin(0.5);
 
-            EventBus.emit('updateCoins', 1);
-            this.exitScene(true);
+        this.add.text(this.scale.width / 2, (this.scale.height / 2) + 50, `Ganaste ${estrellasObtenidas} ${textoEstrellas}`, {
+            fontSize: '30px', fill: '#ff0', stroke: '#000', strokeThickness: 6
+        }).setOrigin(0.5);
+
+        EventBus.emit('updateCoins', estrellasObtenidas);
+        const isStoryMode = this.levelData && this.levelData.gameMode === 'historia';
+
+        if (isStoryMode) {
+            this.createEndButton('Continuar', () => {
+                this.scene.start('MapScene', { win: true, config: this.levelData });
+            });
         }
     }
 
-    private triggerTimeOut() {
+    private triggerLoss(mensaje: string) {
         this.gameState.isGameOver = true;
         this.emotionState.transitionTo(new SuperSadState());
 
         if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop();
         this.physics.pause();
 
-        this.add.text(this.scale.width / 2, this.scale.height / 2, '¡SE ACABÓ EL TIEMPO!', {
+        this.add.text(this.scale.width / 2, this.scale.height / 2, mensaje, {
             fontSize: '40px', fill: '#f00', stroke: '#000', strokeThickness: 6
         }).setOrigin(0.5);
 
-        this.exitScene(false);
-    }
-
-    private exitScene(isWin: boolean) {
-        this.time.delayedCall(3000, () => {
-            if (this.levelData && this.levelData.gameMode === 'historia') {
-                this.scene.start('MapScene', { win: isWin });
-            }
+        this.createEndButton('Reiniciar Nivel', () => {
+            this.scene.restart({ config: this.levelData });
         });
+    }
+    private createEndButton(text: string, onClick: () => void) {
+        const btn = this.add.text(this.scale.width / 2, (this.scale.height / 2) + 120, text, {
+            fontSize: '24px',
+            backgroundColor: '#4C1D95',
+            padding: { x: 20, y: 10 },
+            color: '#FFF',
+            stroke: '#000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        btn.on('pointerover', () => btn.setStyle({ backgroundColor: '#6D28D9' }));
+        btn.on('pointerout', () => btn.setStyle({ backgroundColor: '#4C1D95' }));
+        btn.on('pointerdown', onClick);
     }
 }

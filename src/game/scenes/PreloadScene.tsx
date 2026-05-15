@@ -16,6 +16,14 @@ export class PreloadScene extends Phaser.Scene{
         }
         //MENU
         this.load.image('main_menu_base', '/assets/MainMenu.png');
+        this.load.image('mute', '/assets/mute.png');
+        this.load.image('sound_on', '/assets/sound_on.png');
+        this.load.image('play', '/assets/play.png');
+        this.load.image('pause', '/assets/pause.png');
+        this.load.image('btn_menu_0', '/assets/btn_menu_0.png');
+        this.load.image('btn_menu_1', '/assets/btn_menu_1.png');
+        this.load.image('btn_jugar_0', '/assets/btn_jugar_0.png');
+        this.load.image('btn_jugar_1', '/assets/btn_jugar_1.png');
 
         //MAPAS
         this.load.image('mapa_agua', '/assets/mapa_agua.png');

@@ -3,17 +3,19 @@ import * as Phaser from 'phaser';
 export const MapConfig = {
     // Coordenadas de los puntos del Mapa Tierra
     pointDataTierra: [
-        { x: 216, y: 887 }, // Punto 1 (Verde)
-        { x: 493, y: 721 }, // Punto 2 (Púrpura)
-        { x: 301, y: 284 }, // Punto 3 (Amarillo)
-        { x: 914, y: 295 }  // Punto 4 (Rosa)
+        { x: 172, y: 519 }, // Punto 1
+        { x: 252, y: 209 }, // Punto 2
+        { x: 379, y: 407 }, // Punto 3
+        { x: 516, y: 495 }, // Punto 4
+        { x: 692, y: 211 } // Punto 5
     ],
     // Coordenadas de los puntos del Mapa Agua
     pointDataAgua: [
-        { x: 137, y: 853 }, // Punto 1 (Verde)
-        { x: 809, y: 818 }, // Punto 2 (Azul claro)
-        { x: 326, y: 310 }, // Punto 3 (Amarillo)
-        { x: 746, y: 280 }  // Punto 4 (Rosa)
+        { x: 103, y: 520 }, // Punto 1
+        { x: 276, y: 169 }, // Punto 2
+        { x: 364, y: 314 }, // Punto 3
+        { x: 623, y: 464 },  // Punto 4
+        { x: 633, y: 206 }  //Punto 5
     ]
 };
 
@@ -44,37 +46,31 @@ export class MathStrategy {
 export interface EmotionState {
     apply(player: Phaser.GameObjects.Sprite, uiEmotionImage: Phaser.GameObjects.Image): void;
 }
-
 export class EmotionContext {
     private player: Phaser.GameObjects.Sprite;
     private uiEmotionImage: Phaser.GameObjects.Image;
     private state!: EmotionState;
-
     constructor(playerSprite: Phaser.GameObjects.Sprite, uiEmotionImage: Phaser.GameObjects.Image) {
         this.player = playerSprite;
         this.uiEmotionImage = uiEmotionImage;
         this.transitionTo(new NormalState());
     }
-
     transitionTo(state: EmotionState) {
         this.state = state;
         this.state.apply(this.player, this.uiEmotionImage);
     }
 }
-
 class NormalState implements EmotionState {
     apply(player: Phaser.GameObjects.Sprite, uiEmotionImage: Phaser.GameObjects.Image) {
         player.clearTint();
         uiEmotionImage.setTexture('avatar_normal');
     }
 }
-
 export class SadState implements EmotionState {
     apply(player: Phaser.GameObjects.Sprite, uiEmotionImage: Phaser.GameObjects.Image) {
         uiEmotionImage.setTexture('avatar_sad');
     }
 }
-
 export class HappyState implements EmotionState {
     apply(player: Phaser.GameObjects.Sprite, uiEmotionImage: Phaser.GameObjects.Image) {
         uiEmotionImage.setTexture('avatar_happy');
@@ -250,15 +246,23 @@ export class UIFacade {
             }
         };
 
+        const updateLivesHandler = (lives: number) => {
+            if (this.livesText && this.livesText.active) {
+                this.livesText.setText(`Vidas: ${lives}`);
+            }
+        };
+
         EventBus.on('updateCoins', updateCoinsHandler, this);
         EventBus.on('updateTime', updateTimeHandler, this);
+        EventBus.on('updateLives', updateLivesHandler, this);
 
         this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             EventBus.off('updateTime', updateTimeHandler, this);
             EventBus.off('updateCoins', updateCoinsHandler, this);
+            EventBus.off('updateLives', updateLivesHandler, this);
         });
     }
-    public createBottomBar(gameWidth: number, gameHeight: number, barHeight: number, barBgKey: any) {
+    public createBottomBar(gameWidth: number, gameHeight: number, barHeight: number, barBgKey: any, currentLives: number = 3) {
         const playableHeight = gameHeight - barHeight;
         const barCenterY = playableHeight + (barHeight / 2);
 
@@ -287,7 +291,7 @@ export class UIFacade {
         const leftPanelX = gameWidth / 5;
         const rightPanelX = (3 * gameWidth) / 4;
 
-        this.livesText = this.scene.add.text(leftPanelX, barCenterY - 25, 'Vidas: 3', style)
+        this.livesText = this.scene.add.text(leftPanelX, barCenterY - 25, `Vidas: ${currentLives}`, style)
             .setOrigin(0.5, 0.5)
             .setDepth(200);
 
@@ -317,5 +321,35 @@ export class UIFacade {
     }
     getEmotionImageObject(): Phaser.GameObjects.Image {
         return this.emotionImage;
+    }
+    public createControlButtons(gameWidth: number) {
+        const style = {
+            fontSize: '22px',
+            backgroundColor: '#374151', // Gris oscuro para que resalte
+            padding: { x: 10, y: 5 },
+            color: '#FFF'
+        };
+
+        // 1. BOTÓN MUTEAR (Controla el sonido global directamente)
+        let isMuted = this.scene.sound.mute;
+        const muteBtn = this.scene.add.image(gameWidth - 110, 30, isMuted ? 'mute' : 'sound_on')
+            .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(200);
+
+        muteBtn.on('pointerdown', () => {
+            isMuted = !isMuted;
+            this.scene.sound.mute = isMuted; // Phaser maneja el muteo global automáticamente
+            muteBtn.setTexture(isMuted ? 'mute' : 'sound_on');
+        });
+
+        // 2. BOTÓN PAUSA (Avisa a GameScene mediante EventBus)
+        let isPaused = false;
+        const pauseBtn = this.scene.add.image(gameWidth - 50, 30, isPaused ? 'pause': 'play')
+            .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(200);
+
+        pauseBtn.on('pointerdown', () => {
+            isPaused = !isPaused;
+            pauseBtn.setTexture(isPaused ? 'pause' : 'play');
+            EventBus.emit('togglePause', isPaused);
+        });
     }
 }
