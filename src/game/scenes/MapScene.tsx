@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { EventBus, MapConfig } from './patterns';
+import {LevelsTierra, LevelsAgua} from "@/game/scenes/LevelsData";
 
 export class MapScene extends Phaser.Scene {
     private static currentLevelPointTierra: number = 0; // Puntos: 0, 1, 2, 3
@@ -39,8 +40,11 @@ export class MapScene extends Phaser.Scene {
         const pointData = this.currentElement === 'tierra' ? MapConfig.pointDataTierra : MapConfig.pointDataAgua;
         const currentPointIndex = this.currentElement === 'tierra' ? MapScene.currentLevelPointTierra : MapScene.currentLevelPointAgua;
 
-        if (currentPointIndex < pointData.length) {
-            const currentPoint = pointData[currentPointIndex];
+        const isWorldCompleted = currentPointIndex >= pointData.length;
+        const displayPointIndex = isWorldCompleted ? pointData.length - 1 : currentPointIndex;
+
+        if (displayPointIndex < pointData.length) {
+            const currentPoint = pointData[displayPointIndex];
             this.playerAvatar = this.add.sprite(currentPoint.x, currentPoint.y, 'axolotl_idle').setScale(1.5).setDepth(100);
             if (!this.anims.exists('idle_map')) {
                 this.anims.create({
@@ -52,14 +56,27 @@ export class MapScene extends Phaser.Scene {
             }
             this.playerAvatar.play('idle_map');
         }
+        const buttonText = isWorldCompleted ? 'REINICIAR' : 'JUGAR';
 
         const playButton = this.add.image(width / 2, height / 2, 'btn_jugar_0')
             .setOrigin(-2.8,-4.5).setInteractive();
         playButton.on('pointerover', () => playButton.setTexture('btn_jugar_1' ));
         playButton.on('pointerout', () => playButton.setTexture('btn_jugar_0' ));
         playButton.on('pointerdown', () => {
-            const finalLevelData = this.prepareLevelData(currentPointIndex);
-            this.scene.start('GameScene', { config: finalLevelData, mode: 'historia' });
+            if (isWorldCompleted) {
+                // 3. CONDICIÓN: Si presiona REINICIAR, reseteamos el progreso del mundo a 0
+                if (this.currentElement === 'tierra') MapScene.currentLevelPointTierra = 0;
+                else MapScene.currentLevelPointAgua = 0;
+
+                this.scene.restart({ config: this.levelData });
+            } else {
+                const currentIndexFresh = this.currentElement === 'tierra'
+                    ? MapScene.currentLevelPointTierra
+                    : MapScene.currentLevelPointAgua;
+
+                const finalLevelData = this.prepareLevelData(currentIndexFresh);
+                this.scene.start('GameScene', { config: finalLevelData, mode: 'historia' });
+            }
         });
 
         const returnButton = this.add.image(width / 2, height / 2, 'btn_menu_0')
@@ -82,33 +99,34 @@ export class MapScene extends Phaser.Scene {
     }
 
     private prepareLevelData(currentPointIndex: number): any {
-        const operationGroup = this.levelData.selectedOperations;
-        const numTrampas = 3;
-        let operation: string = 'suma';
+        let levelConfig: any;
 
-        if (operationGroup === 'suma_resta') {
-            operation = currentPointIndex % 2 === 0 ? 'suma' : 'resta';
-        } else if (operationGroup === 'mult_div') {
-            operation = currentPointIndex % 2 === 0 ? 'multiplicacion' : 'division';
+        // Seleccionamos la configuracion correspondiente al mundo actual
+        if (this.currentElement === 'tierra') {
+            // Utilizamos Math.min para evitar errores si el jugador llega a un punto
+            // en el mapa que aun no tiene un nivel configurado en el arreglo
+            const safeIndex = Math.min(currentPointIndex, LevelsTierra.length - 1);
+            levelConfig = LevelsTierra[safeIndex];
+        } else {
+            const safeIndex = Math.min(currentPointIndex, LevelsAgua.length - 1);
+            levelConfig = LevelsAgua[safeIndex];
         }
 
+        // Armamos el objeto de datos que GameScene esta esperando recibir
         const data: any = {
             element: this.currentElement,
-            operation: operation,
-            cifras: [120, 280],
-            resultado: 400,
-            numCifras: 2,
-            numTrampas: numTrampas,
-            trampas: [300, 500, 150],
-            type: 'repaso'
+            operation: levelConfig.operation,
+            cifras: levelConfig.cifras,
+            resultado: levelConfig.resultado,
+            numCifras: levelConfig.cifras.length,
+            numTrampas: levelConfig.trampas.length,
+            trampas: levelConfig.trampas,
+            type: levelConfig.type
         };
 
-        if (this.currentElement === 'agua') {
-            data.cifras = [15, 10];
-            data.resultado = 150;
-            data.trampas = [25, 1500, 105, 50];
-            data.timeLimit = 120; // 2 minutos
-            data.type = 'prueba';
+        // Verificamos si el nivel configurado tiene limite de tiempo
+        if (levelConfig.timeLimit) {
+            data.timeLimit = levelConfig.timeLimit;
         }
 
         return data;
@@ -135,6 +153,16 @@ export class MapScene extends Phaser.Scene {
                 duration: 1000,
                 ease: 'Power2'
             });
+        } else {
+            // 4. CONDICIÓN: Si ganó el último nivel (sin importar las estrellas), aumentamos el contador
+            // una posición más allá del límite para marcarlo como resuelto definitivamente.
+            if (this.currentElement === 'tierra') {
+                MapScene.currentLevelPointTierra++;
+            } else {
+                MapScene.currentLevelPointAgua++;
+            }
+            // Reiniciamos inmediatamente la escena para actualizar el texto del botón a "REINICIAR"
+            this.scene.restart({ config: this.levelData });
         }
     }
 }
