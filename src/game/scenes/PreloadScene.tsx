@@ -24,6 +24,12 @@ export class PreloadScene extends Phaser.Scene{
         this.load.image('btn_menu_1', '/assets/btn_menu_1.png');
         this.load.image('btn_jugar_0', '/assets/btn_jugar_0.png');
         this.load.image('btn_jugar_1', '/assets/btn_jugar_1.png');
+        this.load.image('btn_continuar_0', '/assets/btn_continuar_0.png');
+        this.load.image('btn_continuar_1', '/assets/btn_continuar_1.png');
+        this.load.image('btn_volver_a_jugar_0', '/assets/btn_volver_a_jugar_0.png');
+        this.load.image('btn_volver_a_jugar_1', '/assets/btn_volver_a_jugar_1.png');
+        this.load.image('btn_reiniciar_0', '/assets/btn_reiniciar_0.png');
+        this.load.image('btn_reiniciar_1', '/assets/btn_reiniciar_1.png');
 
         //MAPAS
         this.load.image('mapa_agua', '/assets/mapa_agua.png');
@@ -46,6 +52,17 @@ export class PreloadScene extends Phaser.Scene{
         this.load.spritesheet('axolotl_idle', '/assets/axolote_idle32x32.png', { frameWidth: 32, frameHeight: 32 });
         this.load.spritesheet('axolotl_walking', '/assets/axolote_walking32x32.png', { frameWidth: 32, frameHeight: 32 });
 
+        //PERSONAJES EN NARRATIVA TERRESTRE
+        this.load.image('leon', '/assets/leon.png');
+        this.load.image('mono', '/assets/mono.png');
+        this.load.image('jirafa', '/assets/jirafa.png');
+        this.load.image('zebra', '/assets/zeb.png');
+
+        //PERSONAJES EN NARRATIVA MARINA
+        this.load.image('cocodrilo', '/assets/coco.png');
+        this.load.image('delfin', '/assets/delfin.png');
+        this.load.image('hipo', '/assets/hipo.png');
+        this.load.image('pingu', '/assets/pingui.png');
 
         //AVATAR
         this.load.image('avatar_normal', '/assets/avatar_normal.png');
@@ -56,6 +73,8 @@ export class PreloadScene extends Phaser.Scene{
 
         //SONIDOS DE FONDO
         this.load.audio('bg_music', '/assets/bg_sound.mp3');
+        this.load.audio('bg_map', '/assets/bg_map.mp3');
+        this.load.audio('fanfare', '/assets/fanfare_1.mp3');
 
         this.load.on('loaderror', (fileObj: any) => {
             console.error("Fallo al cargar:", fileObj.src);

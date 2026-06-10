@@ -22,6 +22,7 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
             const { MainMenuScene } = await import('@/game/scenes/MainMenuScene');
             const { MapScene } = await import('@/game/scenes/MapScene');
             const { GameScene } = await import('@/game/scenes/GameScene');
+            const { TransitionScene } = await import('@/game/scenes/TransitionScene');
 
             const config: PhaserType.Types.Core.GameConfig = {
                 type: Phaser.AUTO,
@@ -42,6 +43,7 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                 gameRef.current.scene.add('MainMenuScene', MainMenuScene);
                 gameRef.current.scene.add('MapScene', MapScene);
                 gameRef.current.scene.add('GameScene', GameScene);
+                gameRef.current.scene.add('TransitionScene', TransitionScene);
 
                 setTimeout(() => {
                     if (gameRef.current) {

@@ -3,6 +3,7 @@ import {
     EventBus, MathStrategy, EmotionContext,
     SadState, HappyState, LevelBuilder, UIFacade, NumberItem, SuperHappyState, SuperSadState
 } from './patterns';
+import {audioManager} from "@/game/scenes/audioManager";
 
 export class GameScene extends Phaser.Scene {
     private player!: Phaser.Physics.Arcade.Sprite;
@@ -153,8 +154,7 @@ export class GameScene extends Phaser.Scene {
             console.warn("Texturas del Axolote no encontradas. Saltando animaciones.");
         }
 
-        this.bgMusic = this.sound.add('bg_music', { volume: 0.3, loop: true });
-        this.bgMusic.play();
+        audioManager(this, 'bg_music');
 
         EventBus.on('togglePause', (paused: boolean) => {
             this.gameState.isPaused = paused;
@@ -263,14 +263,26 @@ export class GameScene extends Phaser.Scene {
             if (this.gameState.lives > 0) {
                 this.gameState.isGameOver = true;
                 this.emotionState.transitionTo(new SuperSadState());
-                if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop();
+                const currentMusicKey = this.registry.get('currentMusicKey');
+                if (currentMusicKey) {
+                    const currentMusic = this.sound.get(currentMusicKey);
+                    if (currentMusic && currentMusic.isPlaying) {
+                        currentMusic.stop();
+                    }
+                    this.registry.set('currentMusicKey', null);
+                }
                 this.physics.pause();
 
                 this.add.text(this.scale.width / 2, this.scale.height / 2, 'Vuelve a intentarlo', {
                     fontSize: '40px', fill: '#ff0', stroke: '#000', strokeThickness: 6
                 }).setOrigin(0.5);
 
-                this.createEndButton('Siguiente Intento', () => {
+                const btn = this.add.image(this.scale.width / 2, (this.scale.height / 2) + 120,'btn_volver_a_jugar_0')
+                    .setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+                btn.on('pointerover', () => btn.setTexture('btn_volver_a_jugar_1'));
+                btn.on('pointerout', () => btn.setTexture('btn_volver_a_jugar_0'));
+                btn.on('pointerdown', () => {
                     this.scene.restart({ config: this.levelData, lives: this.gameState.lives });
                 });
             } else {
@@ -284,26 +296,57 @@ export class GameScene extends Phaser.Scene {
         this.gameState.isGameOver = true;
         this.emotionState.transitionTo(new SuperHappyState());
         doorSprite.setTexture('door_open');
-        if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop();
+            const currentMusicKey = this.registry.get('currentMusicKey');
+            if (currentMusicKey) {
+                const currentMusic = this.sound.get(currentMusicKey);
+                if (currentMusic && currentMusic.isPlaying) {
+                    currentMusic.stop();
+                    this.bgMusic = this.sound.add('fanfare', { volume: 0.4, loop: false });
+                    this.bgMusic.play();
+                }
+                this.registry.set('currentMusicKey', null);
+            }
         this.physics.pause();
 
         const estrellasObtenidas = this.gameState.lives;
+
+        // --- ENVIAR ESTADISTICAS ---
+        const stats = {
+            Tiempo: Math.floor(this.gameState.elapsedTime),
+            Dificultad: this.levelConfig.targetNumbers.length >= 4 ? 3 : (this.levelConfig.targetNumbers.length === 3 ? 2 : 1),
+            Puntos: (this.gameState.collectedNumbers.length * 10) + (estrellasObtenidas * 20),
+            Emocion: estrellasObtenidas === 3 ? 3 : 2, // 3 = Muy Feliz, 2 = Feliz
+            Monedas: estrellasObtenidas
+        };
+        EventBus.emit('gameOverStats', stats);
+        // ---------------------------
+
         const textoEstrellas = estrellasObtenidas === 1 ? 'estrella' : 'estrellas';
 
         this.add.text(this.scale.width / 2, this.scale.height / 2, 'NIVEL COMPLETADO', {
-            fontSize: '40px', fill: '#0f0', stroke: '#000', strokeThickness: 6
+            fontSize: '40px', color: '#0f0', stroke: '#000', strokeThickness: 6
         }).setOrigin(0.5);
 
         this.add.text(this.scale.width / 2, (this.scale.height / 2) + 50, `Ganaste ${estrellasObtenidas} ${textoEstrellas}`, {
-            fontSize: '30px', fill: '#ff0', stroke: '#000', strokeThickness: 6
+            fontSize: '30px', color: '#ff0', stroke: '#000', strokeThickness: 6
         }).setOrigin(0.5);
 
         EventBus.emit('updateCoins', estrellasObtenidas);
         const isStoryMode = this.levelData && this.levelData.gameMode === 'historia';
 
         if (isStoryMode) {
-            this.createEndButton('Continuar', () => {
-                this.scene.start('MapScene', { win: true, config: this.levelData });
+            const btn = this.add.image(this.scale.width / 2, (this.scale.height / 2) + 120,'btn_continuar_0')
+                .setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+            btn.on('pointerover', () => btn.setTexture('btn_continuar_1'));
+            btn.on('pointerout', () => btn.setTexture('btn_continuar_0'));
+            btn.on('pointerdown', () => {
+                this.scene.start('TransitionScene', {
+                    next: 'MapScene',
+                    message: this.levelData.successText,
+                    bg: this.levelData.bgKey,
+                    nextData: { win: true, config: this.levelData }
+                });
             });
         }
     }
@@ -312,29 +355,39 @@ export class GameScene extends Phaser.Scene {
         this.gameState.isGameOver = true;
         this.emotionState.transitionTo(new SuperSadState());
 
-        if (this.bgMusic && this.bgMusic.isPlaying) this.bgMusic.stop();
+        const currentMusicKey = this.registry.get('currentMusicKey');
+
+        if (currentMusicKey) {
+            const currentMusic = this.sound.get(currentMusicKey);
+            if (currentMusic && currentMusic.isPlaying) {
+                currentMusic.stop();
+            }
+            this.registry.set('currentMusicKey', null);
+        }
         this.physics.pause();
 
+        // --- ENVIAR ESTADISTICAS ---
+        const stats = {
+            Tiempo: Math.floor(this.gameState.elapsedTime),
+            Dificultad: this.levelConfig.targetNumbers.length >= 4 ? 3 : (this.levelConfig.targetNumbers.length === 3 ? 2 : 1),
+            Puntos: this.gameState.collectedNumbers.length * 10, // Ejemplo logico de puntos
+            Emocion: 1, // 1 = Triste (SuperSadState)
+            Monedas: 0  // Perdio todo
+        };
+        EventBus.emit('gameOverStats', stats);
+        // ---------------------------
+
         this.add.text(this.scale.width / 2, this.scale.height / 2, mensaje, {
-            fontSize: '40px', fill: '#f00', stroke: '#000', strokeThickness: 6
+            fontSize: '40px', color: '#f00', stroke: '#000', strokeThickness: 6
         }).setOrigin(0.5);
 
-        this.createEndButton('Reiniciar Nivel', () => {
+        const btn = this.add.image(this.scale.width / 2, (this.scale.height / 2) + 120,'btn_reiniciar_0')
+            .setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        btn.on('pointerover', () => btn.setTexture('btn_reiniciar_1'));
+        btn.on('pointerout', () => btn.setTexture('btn_reiniciar_0'));
+        btn.on('pointerdown', () => {
             this.scene.restart({ config: this.levelData });
         });
-    }
-    private createEndButton(text: string, onClick: () => void) {
-        const btn = this.add.text(this.scale.width / 2, (this.scale.height / 2) + 120, text, {
-            fontSize: '24px',
-            backgroundColor: '#4C1D95',
-            padding: { x: 20, y: 10 },
-            color: '#FFF',
-            stroke: '#000',
-            strokeThickness: 4
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-        btn.on('pointerover', () => btn.setStyle({ backgroundColor: '#6D28D9' }));
-        btn.on('pointerout', () => btn.setStyle({ backgroundColor: '#4C1D95' }));
-        btn.on('pointerdown', onClick);
     }
 }

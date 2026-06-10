@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { EventBus, MapConfig } from './patterns';
 import {LevelsTierra, LevelsAgua} from "@/game/scenes/LevelsData";
+import {audioManager} from "@/game/scenes/audioManager";
 
 export class MapScene extends Phaser.Scene {
     private static currentLevelPointTierra: number = 0; // Puntos: 0, 1, 2, 3
@@ -56,8 +57,6 @@ export class MapScene extends Phaser.Scene {
             }
             this.playerAvatar.play('idle_map');
         }
-        const buttonText = isWorldCompleted ? 'REINICIAR' : 'JUGAR';
-
         const playButton = this.add.image(width / 2, height / 2, 'btn_jugar_0')
             .setOrigin(-2.8,-4.5).setInteractive();
         playButton.on('pointerover', () => playButton.setTexture('btn_jugar_1' ));
@@ -75,7 +74,12 @@ export class MapScene extends Phaser.Scene {
                     : MapScene.currentLevelPointAgua;
 
                 const finalLevelData = this.prepareLevelData(currentIndexFresh);
-                this.scene.start('GameScene', { config: finalLevelData, mode: 'historia' });
+                this.scene.start('TransitionScene', {
+                    next: 'GameScene',
+                    message: finalLevelData.introText,
+                    bg: finalLevelData.bgKey,
+                    nextData: { config: finalLevelData, mode: 'historia' }
+                });
             }
         });
 
@@ -89,6 +93,7 @@ export class MapScene extends Phaser.Scene {
             this.scene.start('MainMenuScene', { config: finalLevelData, mode: 'historia' });
         });
 
+        audioManager(this,'bg_map')
 
         if (this.justWon) {
             this.justWon = false;
@@ -121,7 +126,10 @@ export class MapScene extends Phaser.Scene {
             numCifras: levelConfig.cifras.length,
             numTrampas: levelConfig.trampas.length,
             trampas: levelConfig.trampas,
-            type: levelConfig.type
+            type: levelConfig.type,
+            bgKey:levelConfig.bgKey,
+            introText: levelConfig.introText,
+            successText: levelConfig.successText
         };
 
         // Verificamos si el nivel configurado tiene limite de tiempo

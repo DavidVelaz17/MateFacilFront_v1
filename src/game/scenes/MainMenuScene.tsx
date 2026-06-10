@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser';
+import {audioManager} from "@/game/scenes/audioManager";
 
 export class MainMenuScene extends Phaser.Scene {
     constructor() {
@@ -9,6 +10,7 @@ export class MainMenuScene extends Phaser.Scene {
         const width = this.scale.width;
         const height = this.scale.height;
 
+        audioManager(this, 'bg_map');
         this.add.image(0, 0, 'main_menu_base').setOrigin(0, 0).setDisplaySize(width, height);
 
         const tierraArea = this.add.zone(0, 0, width, height / 2).setOrigin(0, 0);
