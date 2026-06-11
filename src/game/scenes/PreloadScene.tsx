@@ -30,6 +30,8 @@ export class PreloadScene extends Phaser.Scene{
         this.load.image('btn_volver_a_jugar_1', '/assets/btn_volver_a_jugar_1.png');
         this.load.image('btn_reiniciar_0', '/assets/btn_reiniciar_0.png');
         this.load.image('btn_reiniciar_1', '/assets/btn_reiniciar_1.png');
+        this.load.image('btn_mapa_0', '/assets/btn_mapa_0.png');
+        this.load.image('btn_mapa_1', '/assets/btn_mapa_1.png');
 
         //MAPAS
         this.load.image('mapa_agua', '/assets/mapa_agua.png');

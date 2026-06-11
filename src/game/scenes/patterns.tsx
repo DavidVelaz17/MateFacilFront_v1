@@ -305,7 +305,7 @@ export class UIFacade {
 
         this.equationText = this.scene.add.text(rightPanelX, barCenterY - 24, '? x ? = 50', {
             fontSize: '28px',
-            fill: '#fff',
+            color: '#fff',
             stroke: '#000',
             strokeThickness: 4,
             fontFamily: 'system-ui',

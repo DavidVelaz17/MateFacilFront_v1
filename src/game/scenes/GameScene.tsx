@@ -274,7 +274,7 @@ export class GameScene extends Phaser.Scene {
                 this.physics.pause();
 
                 this.add.text(this.scale.width / 2, this.scale.height / 2, 'Vuelve a intentarlo', {
-                    fontSize: '40px', fill: '#ff0', stroke: '#000', strokeThickness: 6
+                    fontSize: '40px', color: '#ff0', stroke: '#000', strokeThickness: 6
                 }).setOrigin(0.5);
 
                 const btn = this.add.image(this.scale.width / 2, (this.scale.height / 2) + 120,'btn_volver_a_jugar_0')

@@ -38,18 +38,20 @@ export class TransitionScene extends Phaser.Scene {
 
         const buttonY = height * 0.70;
 
-        const btnMap = this.add.image((width/2)-285, buttonY, 'btn_menu_0') //TODO cambiar asset a map
-            .setOrigin(0.5).setInteractive({ useHandCursor: true });
+        if (this.nextSceneKey === 'GameScene') {
+            const btnMap = this.add.image((width / 2) - 285, buttonY, 'btn_mapa_0')
+                .setOrigin(0.5).setInteractive({useHandCursor: true});
 
-        btnMap.on('pointerover', () => btnMap.setTexture('btn_menu_1'));
-        btnMap.on('pointerout', () => btnMap.setTexture('btn_menu_0'));
-        btnMap.on('pointerdown', () => {
-            const mapData = this.nextSceneData && this.nextSceneData.config
-                ? { config: this.nextSceneData.config }
-                : {};
+            btnMap.on('pointerover', () => btnMap.setTexture('btn_mapa_1'));
+            btnMap.on('pointerout', () => btnMap.setTexture('btn_mapa_0'));
+            btnMap.on('pointerdown', () => {
+                const mapData = this.nextSceneData && this.nextSceneData.config
+                    ? {config: this.nextSceneData.config}
+                    : {};
 
-            this.scene.start('MapScene', mapData);
-        });
+                this.scene.start('MapScene', mapData);
+            });
+        }
 
         const btn = this.add.image((width/2)+250, buttonY, 'btn_continuar_0')
             .setOrigin(0.5).setInteractive({ useHandCursor: true });
