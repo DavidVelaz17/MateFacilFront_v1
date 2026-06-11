@@ -31,9 +31,22 @@ export default function AdminDashboard() {
     });
 
     // --- EFECTOS ---
+    // Efecto de Autenticacion y Carga Inicial
     useEffect(() => {
+        const token = localStorage.getItem("token");
+
+        if (!token || token === "undefined" || token === "null") {
+            console.warn("Bloqueo: Redirigiendo al login...");
+            router.push("/");
+            return;
+        }
+
+        // Configura Axios para enviar el token en la peticion POST y GET
+        axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+        // Una vez configurado el token, ya podemos solicitar los docentes
         fetchTeachers();
-    }, []);
+    }, [router]);
 
     // --- MANEJADORES DE BASE DE DATOS (AXIOS) ---
     const fetchTeachers = async () => {

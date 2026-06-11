@@ -1,63 +1,75 @@
 "use client";
 import { useEffect, useRef } from 'react';
 import type * as PhaserType from 'phaser';
-import { MainScene } from '@/game/scenes/MainScene';
 
-// 1. DEFINIMOS LOS PROPS QUE RECIBE EL COMPONENTE
 interface PhaserGameProps {
     levelData?: any;
 }
 
 export default function PhaserGame({ levelData }: PhaserGameProps) {
     const gameRef = useRef<PhaserType.Game | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        if (!containerRef.current) return;
+
         const initPhaser = async () => {
-            const Phaser = (await import('phaser')).default;
+            const PhaserModule = await import('phaser');
+            const Phaser = PhaserModule.default || PhaserModule;
+
+            const { PreloadScene } = await import('@/game/scenes/PreloadScene');
+            const { BootScene } = await import('@/game/scenes/BootScene');
+            const { MainMenuScene } = await import('@/game/scenes/MainMenuScene');
+            const { MapScene } = await import('@/game/scenes/MapScene');
+            const { GameScene } = await import('@/game/scenes/GameScene');
+            const { TransitionScene } = await import('@/game/scenes/TransitionScene');
 
             const config: PhaserType.Types.Core.GameConfig = {
                 type: Phaser.AUTO,
-                parent: 'phaser-game',
+                parent: containerRef.current,
                 width: 800,
                 height: 600,
-                // 2. QUITAMOS "scene: [MainScene]" de aquí para iniciarla manualmente
                 physics: {
                     default: 'arcade',
-                    arcade: {
-                        gravity: { y: 800 },
-                        debug: false
-                    }
+                    arcade: { gravity: { y: 800 }, debug: false }
                 },
-                transparent: true,
+                transparent: true
             };
 
-            // 3. INICIAMOS EL JUEGO Y LA ESCENA CON DATOS
             if (!gameRef.current) {
                 gameRef.current = new Phaser.Game(config);
+                gameRef.current.scene.add('PreloadScene', PreloadScene);
+                gameRef.current.scene.add('BootScene', BootScene);
+                gameRef.current.scene.add('MainMenuScene', MainMenuScene);
+                gameRef.current.scene.add('MapScene', MapScene);
+                gameRef.current.scene.add('GameScene', GameScene);
+                gameRef.current.scene.add('TransitionScene', TransitionScene);
 
-                // Agregamos la escena y la iniciamos pasándole el objeto { config: levelData }
-                // Esto es exactamente lo que captura el init(data) de tu MainScene
-                gameRef.current.scene.add('MainScene', MainScene, true, { config: levelData });
+                setTimeout(() => {
+                    if (gameRef.current) {
+                        console.log("React: Arrancando motor con datos ->", levelData);
+                        gameRef.current.scene.start('PreloadScene', { config: levelData });
+                    }
+                }, 100);
             }
-            else {
-                // Si la configuración de React llega unos milisegundos después de que el juego ya cargó,
-                // forzamos a la escena a reiniciarse con los datos correctos.
+            else if (levelData) {
+                console.log("React: Reiniciando motor por nuevos datos ->", levelData);
                 const sceneManager = gameRef.current.scene;
-                if (sceneManager.getScene('MainScene') && levelData) {
-                    sceneManager.start('MainScene', { config: levelData });
-                }
+                sceneManager.getScenes(true).forEach(scene => scene.scene.stop());
+                sceneManager.start('PreloadScene', { config: levelData });
             }
         };
 
-        initPhaser();
-
+        if (typeof window !== 'undefined') {
+            initPhaser();
+        }
         return () => {
             if (gameRef.current) {
                 gameRef.current.destroy(true);
                 gameRef.current = null;
             }
         };
-    }, [levelData]); // 4. Dependencia de React para escuchar cuando llegue el levelData
+    }, [levelData]);
 
-    return null;
+    return <div ref={containerRef} className="w-full h-full" />;
 }

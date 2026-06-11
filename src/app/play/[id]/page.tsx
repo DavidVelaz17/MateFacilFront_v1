@@ -1,59 +1,94 @@
 "use client";
-import { useParams, useRouter, useSearchParams } from "next/navigation"; // Agregamos useSearchParams
-import { ArrowLeft } from "lucide-react";
-import dynamic from "next/dynamic";
-import { useEffect, useState } from "react"; // Agregamos hooks de React
+import { useEffect, useState } from 'react';
+import {useParams, useSearchParams} from 'next/navigation';
+import dynamic from 'next/dynamic';
+import {EventBus} from "@/game/scenes/patterns";
+import axios from "axios";
 
-// IMPORTANTE: Cargamos el componente sin SSR
-const PhaserGame = dynamic(() => import("@/components/PhaserGame"), {
+const PhaserGame = dynamic(() => import('@/components/PhaserGame'), {
     ssr: false,
-    loading: () => <div className="flex items-center justify-center h-full"><p className="text-white text-xl animate-pulse">Cargando motor de juego...</p></div>
+    loading: () => <div className="text-white flex items-center justify-center h-full">Cargando motor de juego...</div>
 });
 
 export default function PlayPage() {
-    const router = useRouter();
-    const params = useParams();
-    const searchParams = useSearchParams(); // Hook para leer la URL
+    const searchParams = useSearchParams();
+    const params = useParams(); // Extrae el ID del discente de la URL (ej. /play/15)
+    const [levelData, setLevelData] = useState<any>(null);
 
-    // Estado para guardar la configuración si es que existe
-    const [gameConfig, setGameConfig] = useState<any>(null);
-
+    // 1. EFECTO ORIGINAL: Carga la configuración del nivel
     useEffect(() => {
-        // Leemos la URL cuando la página carga
         const mode = searchParams.get('mode');
         const configString = searchParams.get('config');
 
+        const initialPhaserData = {
+            mode: mode,
+            config: null as any
+        };
+
         if (mode === 'custom' && configString) {
-            try {
-                // Decodificamos el texto de la URL y lo convertimos a un objeto
-                const parsedConfig = JSON.parse(decodeURIComponent(configString));
-                setGameConfig(parsedConfig);
-            } catch (error) {
-                console.error("Error al leer la configuración del nivel:", error);
-            }
+            initialPhaserData.config = JSON.parse(decodeURIComponent(configString));
         }
+        setLevelData(initialPhaserData);
+
     }, [searchParams]);
 
-    return (
-        <div className="h-screen w-screen flex flex-col bg-gray-900 overflow-hidden">
-            <div className="p-4 bg-gray-800 text-white flex justify-between items-center shadow-md z-10">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => router.back()} className="hover:bg-gray-700 p-2 rounded-full transition-colors">
-                        <ArrowLeft />
-                    </button>
-                    <h2 className="font-bold text-lg">
-                        Jugando: Alumno ID {params.id}
-                        {searchParams.get('mode') === 'custom' ? ' (Modo Custom)' : ' (Modo Historia)'}
-                    </h2>
-                </div>
-            </div>
+    // 2. NUEVO EFECTO: Escucha al EventBus de Phaser y envía a NestJS
+    useEffect(() => {
+        const handleGameOverStats = async (stats: any) => {
+            const idDiscente = params.id;
+            const token = localStorage.getItem('token');
 
-            <div className="flex-1 flex items-center justify-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-700 to-gray-900">
-                {/* Contenedor donde Phaser buscará el ID "phaser-game" */}
-                <div id="phaser-game" className="relative w-[800px] h-[600px] bg-black border-4 border-gray-600 rounded-lg shadow-2xl overflow-hidden">
-                    {/* Le pasamos la configuración al componente del juego */}
-                    <PhaserGame levelData={gameConfig} />
-                </div>
+            // Validaciones de seguridad
+            if (!idDiscente) {
+                console.error("Error: No se encontró el ID del alumno en la URL.");
+                return;
+            }
+            if (!token) {
+                console.error("Error: No hay sesión activa (Falta Token).");
+                return;
+            }
+
+            try {
+                console.log("Atrapando estadísticas desde Phaser:", stats);
+
+                // Envío de las estadísticas procesadas al backend
+                await axios.post(
+                    `http://localhost:3001/discentes/${idDiscente}/attempts`,
+                    stats,
+                    {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }
+                );
+
+                console.log("¡Estadísticas guardadas exitosamente en la base de datos!");
+            } catch (error) {
+                console.error("Fallo al guardar las estadísticas en el backend:", error);
+            }
+        };
+
+        // Encendemos el "micrófono" para escuchar a Phaser
+        EventBus.on('gameOverStats', handleGameOverStats);
+
+        // FUNCIÓN DE LIMPIEZA: Apagamos el "micrófono" si el docente sale de la página
+        // Esto evita que se envíen intentos duplicados a la base de datos
+        return () => {
+            EventBus.off('gameOverStats', handleGameOverStats);
+        };
+    }, [params.id]);
+
+    return (
+        <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
+            <div className="w-full max-w-[800px] flex justify-between items-center mb-4 text-white">
+                <h1 className="text-xl font-bold">MateFácil - Zona de Juego</h1>
+                <button
+                    onClick={() => window.history.back()}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition"
+                >
+                    Volver al Panel
+                </button>
+            </div>
+            <div className="relative w-[800px] h-[600px] bg-black border-4 border-gray-600 rounded-lg shadow-2xl overflow-hidden">
+                {levelData && <PhaserGame levelData={levelData} />}
             </div>
         </div>
     );

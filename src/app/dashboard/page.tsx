@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { jwtDecode } from "jwt-decode";
 import {
     Edit, Trash2, Play, BarChart2, Plus, X,
     Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut
@@ -37,10 +38,17 @@ interface GameConfig {
     trampas: string[];
 }
 
+interface CustomJwtPayload {
+    sub: number;
+    username: string;
+    name: string;
+    role: string;
+}
+
 export default function Dashboard() {
     const router = useRouter();
-    const ID_DOCENTE_ACTUAL = 6;
-
+    const [docenteActualId, setDocenteActualId] = useState<number | null>(null);
+    const [docenteName, setDocenteName] = useState<string>("Cargando...");
     // --- ESTADOS DE ALUMNOS ---
     const [students, setStudents] = useState<Student[]>([]);
     const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -75,6 +83,52 @@ export default function Dashboard() {
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
     const [editingGroup, setEditingGroup] = useState<Group | null>(null);
     const [groupFormData, setGroupFormData] = useState({ Nombre_Grupo: "", Año: "", Grado: "" });
+
+    // 1. EFECTO DE AUTENTICACION (Se ejecuta solo al montar el componente)
+// 1. EFECTO DE AUTENTICACION
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+
+        // Proteccion contra nulos o strings "undefined" accidentales
+        if (!token || token === "undefined" || token === "null") {
+            console.warn("Bloqueo de seguridad: No hay un token valido. Redirigiendo al login...");
+            localStorage.removeItem("token");
+            router.push("/");
+            return;
+        }
+
+        // Configura Axios para que todas las peticiones lleven el token
+        axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+        try {
+            // Decodifica el token para obtener el ID del docente
+            const decoded = jwtDecode<CustomJwtPayload>(token);
+
+            // Verificamos que el payload tenga el ID (sub)
+            if (!decoded.sub) {
+                throw new Error("El token no contiene el ID del usuario (sub)");
+            }
+
+            setDocenteActualId(decoded.sub);
+            setDocenteName(decoded.name);
+            console.log("Acceso autorizado para el usuario ID:", decoded.sub);
+
+        } catch (error) {
+            console.error("Bloqueo de seguridad: Token corrupto o invalido.", error);
+            // Expulsamos al usuario y limpiamos la basura
+            localStorage.removeItem("token");
+            delete axios.defaults.headers.common["Authorization"];
+            router.push("/");
+        }
+    }, [router]);
+
+    // 2. EFECTO DE CARGA DE DATOS (Se ejecuta solo cuando ya tenemos el ID del docente)
+    useEffect(() => {
+        if (docenteActualId !== null) {
+            fetchStudents();
+            fetchGroups();
+        }
+    }, [docenteActualId]);
 
     useEffect(() => {
         fetchStudents();
@@ -207,11 +261,13 @@ export default function Dashboard() {
     const handleGroupSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (docenteActualId === null) return alert("Error de sesión");
+
         const payload = {
             Nombre_Grupo: groupFormData.Nombre_Grupo,
             Año: Number(groupFormData.Año),
             Grado: Number(groupFormData.Grado),
-            docente: { id_docente: ID_DOCENTE_ACTUAL }
+            docente: { id_docente: docenteActualId } // Uso del ID dinamico
         };
 
         try {
@@ -239,6 +295,12 @@ export default function Dashboard() {
                 console.error("Error al eliminar grupo", error);
             }
         }
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem("token");
+        delete axios.defaults.headers.common["Authorization"];
+        router.push("/");
     };
 
     return (
@@ -319,9 +381,9 @@ export default function Dashboard() {
                         P
                     </div>
                     <div className="flex flex-col items-start">
-                        <p className="font-semibold text-gray-200">Profesor</p>
+                        <p className="font-semibold text-gray-200">{docenteName}</p>
                         <button
-                            onClick={() => router.push('/')}
+                            onClick={handleLogout}
                             className="text-xs text-gray-400 hover:text-red-400 transition-colors mt-0.5 flex items-center gap-1"
                         >
                             <LogOut size={12} /> Cerrar sesión
@@ -719,15 +781,15 @@ export default function Dashboard() {
                                         <div className="p-4 bg-red-50 rounded-xl border border-red-100">
                                             <div className="flex justify-between items-center mb-3">
                                                 <label className="text-sm font-semibold text-red-700">
-                                                    Cantidad de números trampa (Máximo 10):
+                                                    Cantidad de números trampa (Máximo 4):
                                                 </label>
                                                 <input
-                                                    type="number" min="0" max="10" required
+                                                    type="number" min="0" max="4" required
                                                     value={gameConfig.numTrampas}
                                                     onChange={(e) => {
                                                         const num = parseInt(e.target.value) || 0;
-                                                        // Validamos el límite de 10 para CUALQUIER elemento
-                                                        const finalNum = num > 10 ? 10 : num;
+                                                        // Validamos el límite de 4 para CUALQUIER elemento
+                                                        const finalNum = num > 4 ? 4 : num;
 
                                                         setGameConfig({...gameConfig, numTrampas: finalNum, trampas: Array(finalNum).fill('')});
                                                     }}
