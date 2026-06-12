@@ -46,7 +46,9 @@ export class TransitionScene extends Phaser.Scene {
             btnMap.on('pointerout', () => btnMap.setTexture('btn_mapa_0'));
             btnMap.on('pointerdown', () => {
                 const mapData = this.nextSceneData && this.nextSceneData.config
-                    ? {config: this.nextSceneData.config}
+                    ? {
+                        config: this.nextSceneData.config,
+                        dificultad: this.nextSceneData.dificultad}
                     : {};
 
                 this.scene.start('MapScene', mapData);
