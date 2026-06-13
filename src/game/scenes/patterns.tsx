@@ -353,27 +353,3 @@ export class UIFacade {
         });
     }
 }
-
-export class DifficultyEvaluator {
-    /**
-     * Calcula y retorna el nuevo nivel de dificultad (1, 2 o 3)
-     */
-    public static evaluate(currentDifficulty: number, timeSeconds: number, lives: number, isRestart: boolean): number {
-        let shift = 0;
-
-        if (isRestart) {
-            // Disminuye la dificultad si el discente reinicia el nivel (derrota)
-            shift = -1;
-        } else {
-            // Regla de tiempo y vidas en caso de victoria
-            if (timeSeconds >= 120 || lives <= 1) {
-                shift = -1; // Disminuye si tarda > 2 mins o casi pierde
-            } else if (timeSeconds <= 30 && lives === 3) {
-                shift = 1;  // Aumenta si es muy rápido (< 30s) y perfecto
-            }
-        }
-
-        // Phaser.Math.Clamp asegura que el valor nunca baje de 1 ni suba de 3
-        return Phaser.Math.Clamp(currentDifficulty + shift, 1, 3);
-    }
-}

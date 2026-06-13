@@ -56,12 +56,11 @@ export default function StatsPage() {
                             minute: '2-digit',
                             hour12: false
                         });
-                        const sessionDifficultyNum = session.Dificultad || session.dificultad || 2;
+
                         return {
                             date: formattedDate,
                             score: session.score,
-                            emotion: emocionesMap[session.emotion] || "Feliz",
-                            difficulty: dificultadMap[sessionDifficultyNum] || "Normal"
+                            emotion: emocionesMap[session.emotion] || "Feliz"
                         };
                     })
                 });
@@ -171,7 +170,6 @@ export default function StatsPage() {
                             <thead className="bg-gray-100 text-gray-600 uppercase">
                             <tr>
                                 <th className="px-6 py-3 whitespace-nowrap">Fecha</th>
-                                <th className="px-6 py-3 whitespace-nowrap">Dificultad</th>
                                 <th className="px-6 py-3 whitespace-nowrap">Puntaje</th>
                                 <th className="px-6 py-3 whitespace-nowrap">Emoción Final</th>
                             </tr>
@@ -181,9 +179,6 @@ export default function StatsPage() {
                             {currentSessions.map((session, index) => (
                                 <tr key={index} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-3">{session.date}</td>
-                                    <td className="px-6 py-3">
-                                        {getDifficultyBadge(session.difficulty)}
-                                    </td>
                                     <td className="px-6 py-3 font-medium">{session.score} / 100</td>
                                     <td className="px-6 py-3">
                                         <span className={`px-2 py-1 rounded text-xs font-bold ${getEmotionColor(session.emotion)}`}>

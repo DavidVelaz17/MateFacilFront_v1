@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { EventBus, MapConfig } from './patterns';
-import { LevelsTierra, LevelsAgua } from "@/game/scenes/LevelsData";
-import { audioManager } from "@/game/scenes/audioManager";
+import {LevelsTierra, LevelsAgua} from "@/game/scenes/LevelsData";
+import {audioManager} from "@/game/scenes/audioManager";
 
 export class MapScene extends Phaser.Scene {
     private static currentLevelPointTierra: number = 0; // Puntos: 0, 1, 2, 3
@@ -22,13 +22,6 @@ export class MapScene extends Phaser.Scene {
             this.currentElement = data.config.element || data.config.selectedElement || 'tierra';
         }
         this.justWon = data && data.win ? true : false;
-
-        // Conservamos la dificultad si viene heredada desde GameScene, si no, inicia en Normal (2)
-        if (data && data.dificultad !== undefined) {
-            this.levelData.dificultad = data.dificultad;
-        } else if (!this.levelData.dificultad) {
-            this.levelData.dificultad = 2; // Default a Normal
-        }
     }
 
     create() {
@@ -64,16 +57,13 @@ export class MapScene extends Phaser.Scene {
             }
             this.playerAvatar.play('idle_map');
         }
-
         const playButton = this.add.image(width / 2, height / 2, 'btn_jugar_0')
-            .setOrigin(-2.8, -4.5).setInteractive();
-
-        playButton.on('pointerover', () => playButton.setTexture('btn_jugar_1'));
-        playButton.on('pointerout', () => playButton.setTexture('btn_jugar_0'));
-
+            .setOrigin(-2.8,-4.5).setInteractive();
+        playButton.on('pointerover', () => playButton.setTexture('btn_jugar_1' ));
+        playButton.on('pointerout', () => playButton.setTexture('btn_jugar_0' ));
         playButton.on('pointerdown', () => {
             if (isWorldCompleted) {
-                // CONDICIÓN: Si presiona REINICIAR, reseteamos el progreso del mundo a 0
+                // 3. CONDICIÓN: Si presiona REINICIAR, reseteamos el progreso del mundo a 0
                 if (this.currentElement === 'tierra') MapScene.currentLevelPointTierra = 0;
                 else MapScene.currentLevelPointAgua = 0;
 
@@ -84,22 +74,17 @@ export class MapScene extends Phaser.Scene {
                     : MapScene.currentLevelPointAgua;
 
                 const finalLevelData = this.prepareLevelData(currentIndexFresh);
-
-                // Extraemos la dificultad actual guardada en el estado del mapa
-                const currentDiff = this.levelData.dificultad;
-
                 this.scene.start('TransitionScene', {
                     next: 'GameScene',
                     message: finalLevelData.introText,
                     bg: finalLevelData.bgKey,
-                    // Inyectamos la dificultad en nextData para que GameScene la reciba
-                    nextData: { config: finalLevelData, mode: 'historia', dificultad: currentDiff }
+                    nextData: { config: finalLevelData, mode: 'historia' }
                 });
             }
         });
 
         const returnButton = this.add.image(width / 2, height / 2, 'btn_menu_0')
-            .setOrigin(4, 5.8).setInteractive();
+            .setOrigin(4,5.8).setInteractive();
 
         returnButton.on('pointerover', () => returnButton.setTexture('btn_menu_1'));
         returnButton.on('pointerout', () => returnButton.setTexture('btn_menu_0'));
@@ -108,7 +93,7 @@ export class MapScene extends Phaser.Scene {
             this.scene.start('MainMenuScene', { config: finalLevelData, mode: 'historia' });
         });
 
-        audioManager(this, 'bg_map');
+        audioManager(this,'bg_map')
 
         if (this.justWon) {
             this.justWon = false;
@@ -121,8 +106,10 @@ export class MapScene extends Phaser.Scene {
     private prepareLevelData(currentPointIndex: number): any {
         let levelConfig: any;
 
-        // Seleccionamos la configuración correspondiente al mundo actual
+        // Seleccionamos la configuracion correspondiente al mundo actual
         if (this.currentElement === 'tierra') {
+            // Utilizamos Math.min para evitar errores si el jugador llega a un punto
+            // en el mapa que aun no tiene un nivel configurado en el arreglo
             const safeIndex = Math.min(currentPointIndex, LevelsTierra.length - 1);
             levelConfig = LevelsTierra[safeIndex];
         } else {
@@ -130,19 +117,22 @@ export class MapScene extends Phaser.Scene {
             levelConfig = LevelsAgua[safeIndex];
         }
 
-        // Armamos el objeto base. No extraemos cifras, resultado o trampas aquí
-        // porque GameScene las extraerá basándose en la dificultad que reciba.
+        // Armamos el objeto de datos que GameScene esta esperando recibir
         const data: any = {
             element: this.currentElement,
             operation: levelConfig.operation,
+            cifras: levelConfig.cifras,
+            resultado: levelConfig.resultado,
+            numCifras: levelConfig.cifras.length,
+            numTrampas: levelConfig.trampas.length,
+            trampas: levelConfig.trampas,
             type: levelConfig.type,
-            bgKey: levelConfig.bgKey,
+            bgKey:levelConfig.bgKey,
             introText: levelConfig.introText,
-            successText: levelConfig.successText,
-            // Pasamos el objeto COMPLETO de problemas para que GameScene elija
-            problemas: levelConfig.problemas
+            successText: levelConfig.successText
         };
 
+        // Verificamos si el nivel configurado tiene limite de tiempo
         if (levelConfig.timeLimit) {
             data.timeLimit = levelConfig.timeLimit;
         }
@@ -172,13 +162,14 @@ export class MapScene extends Phaser.Scene {
                 ease: 'Power2'
             });
         } else {
-            // CONDICIÓN: Si ganó el último nivel, aumentamos el contador
-            // una posición más allá del límite para marcarlo como resuelto.
+            // 4. CONDICIÓN: Si ganó el último nivel (sin importar las estrellas), aumentamos el contador
+            // una posición más allá del límite para marcarlo como resuelto definitivamente.
             if (this.currentElement === 'tierra') {
                 MapScene.currentLevelPointTierra++;
             } else {
                 MapScene.currentLevelPointAgua++;
             }
+            // Reiniciamos inmediatamente la escena para actualizar el texto del botón a "REINICIAR"
             this.scene.restart({ config: this.levelData });
         }
     }
