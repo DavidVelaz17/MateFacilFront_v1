@@ -1,7 +1,8 @@
 import * as Phaser from 'phaser';
 import {
     EventBus, MathStrategy, EmotionContext,
-    SadState, HappyState, LevelBuilder, UIFacade, NumberItem, SuperHappyState, SuperSadState
+    SadState, HappyState, LevelBuilder, UIFacade,
+    NumberItem, SuperHappyState, SuperSadState, DifficultyEvaluator
 } from './patterns';
 import {audioManager} from "@/game/scenes/audioManager";
 
@@ -14,6 +15,7 @@ export class GameScene extends Phaser.Scene {
     private emotionState!: EmotionContext;
     private doorStrategy!: MathStrategy;
     private bgMusic!: Phaser.Sound.BaseSound;
+    private currentDifficulty: number = 2;
 
     private levelData: any = null;
     private currentElement: 'tierra' | 'agua' = 'tierra';
@@ -53,12 +55,18 @@ export class GameScene extends Phaser.Scene {
 
             this.currentElement = this.levelData.element || 'tierra';
 
-            const correctos = this.levelData.cifras || [];
-            const trampas = this.levelData.trampas || [];
+            this.currentDifficulty = data.dificultad || 2;
 
-            this.levelConfig.targetNumbers = correctos.map(Number);
-            this.levelConfig.trapNumbers = trampas.map(Number);
-            this.levelConfig.solution = Number(this.levelData.resultado);
+            const problemasDelNivel = this.levelData.problemas || {};
+            const problemaActual = problemasDelNivel[this.currentDifficulty as keyof typeof problemasDelNivel];
+
+            if (problemaActual) {
+                this.levelConfig.targetNumbers = problemaActual.cifras.map(Number);
+                this.levelConfig.trapNumbers = problemaActual.trampas.map(Number);
+                this.levelConfig.solution = Number(problemaActual.resultado);
+            } else {
+                console.warn("No se encontraron problemas para la dificultad:", this.currentDifficulty);
+            }
 
             this.levelConfig.platformCount = this.levelConfig.targetNumbers.length + this.levelConfig.trapNumbers.length + 2;
         }
@@ -283,10 +291,9 @@ export class GameScene extends Phaser.Scene {
                 btn.on('pointerover', () => btn.setTexture('btn_volver_a_jugar_1'));
                 btn.on('pointerout', () => btn.setTexture('btn_volver_a_jugar_0'));
                 btn.on('pointerdown', () => {
-                    this.scene.restart({ config: this.levelData, lives: this.gameState.lives });
+                    this.scene.restart({ config: this.levelData, lives: this.gameState.lives, dificultad: this.currentDifficulty });
                 });
             } else {
-                // Perdio su ultima oportunidad
                 this.triggerLoss('TE QUEDASTE SIN VIDAS');
             }
             return;
@@ -309,17 +316,18 @@ export class GameScene extends Phaser.Scene {
         this.physics.pause();
 
         const estrellasObtenidas = this.gameState.lives;
+        const tiempoFinal = Math.floor(this.gameState.elapsedTime);
 
-        // --- ENVIAR ESTADISTICAS ---
+        const nextDifficulty = DifficultyEvaluator.evaluate(this.currentDifficulty, tiempoFinal, estrellasObtenidas, false);
+
         const stats = {
-            Tiempo: Math.floor(this.gameState.elapsedTime),
-            Dificultad: this.levelConfig.targetNumbers.length >= 4 ? 3 : (this.levelConfig.targetNumbers.length === 3 ? 2 : 1),
+            Tiempo: tiempoFinal,
+            Dificultad: this.currentDifficulty,
             Puntos: (this.gameState.collectedNumbers.length * 10) + (estrellasObtenidas * 20),
-            Emocion: estrellasObtenidas === 3 ? 3 : 2, // 3 = Muy Feliz, 2 = Feliz
+            Emocion: estrellasObtenidas === 3 ? 3 : 2,
             Monedas: estrellasObtenidas
         };
         EventBus.emit('gameOverStats', stats);
-        // ---------------------------
 
         const textoEstrellas = estrellasObtenidas === 1 ? 'estrella' : 'estrellas';
 
@@ -345,7 +353,7 @@ export class GameScene extends Phaser.Scene {
                     next: 'MapScene',
                     message: this.levelData.successText,
                     bg: this.levelData.bgKey,
-                    nextData: { win: true, config: this.levelData }
+                    nextData: { win: true, config: this.levelData, dificultad: nextDifficulty }
                 });
             });
         }
@@ -365,17 +373,18 @@ export class GameScene extends Phaser.Scene {
             this.registry.set('currentMusicKey', null);
         }
         this.physics.pause();
+        const tiempoFinal = Math.floor(this.gameState.elapsedTime);
 
-        // --- ENVIAR ESTADISTICAS ---
+        const loweredDifficulty = DifficultyEvaluator.evaluate(this.currentDifficulty, tiempoFinal, 0, true);
+
         const stats = {
-            Tiempo: Math.floor(this.gameState.elapsedTime),
-            Dificultad: this.levelConfig.targetNumbers.length >= 4 ? 3 : (this.levelConfig.targetNumbers.length === 3 ? 2 : 1),
-            Puntos: this.gameState.collectedNumbers.length * 10, // Ejemplo logico de puntos
-            Emocion: 1, // 1 = Triste (SuperSadState)
-            Monedas: 0  // Perdio todo
+            Tiempo: tiempoFinal,
+            Dificultad: this.currentDifficulty,
+            Puntos: this.gameState.collectedNumbers.length * 10,
+            Emocion: 1,
+            Monedas: 0
         };
         EventBus.emit('gameOverStats', stats);
-        // ---------------------------
 
         this.add.text(this.scale.width / 2, this.scale.height / 2, mensaje, {
             fontSize: '40px', color: '#f00', stroke: '#000', strokeThickness: 6
@@ -387,7 +396,7 @@ export class GameScene extends Phaser.Scene {
         btn.on('pointerover', () => btn.setTexture('btn_reiniciar_1'));
         btn.on('pointerout', () => btn.setTexture('btn_reiniciar_0'));
         btn.on('pointerdown', () => {
-            this.scene.restart({ config: this.levelData });
+            this.scene.restart({ config: this.levelData, lives: 3, dificultad: loweredDifficulty });
         });
     }
 }
