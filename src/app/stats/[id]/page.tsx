@@ -38,7 +38,7 @@ export default function StatsPage() {
                 const timeString = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 
                 const emocionesMap: Record<number, string> = { 1: "Frustrado", 2: "Feliz", 3: "Muy Feliz" };
-                const dificultadMap: Record<number, string> = { 1: "Fácil", 2: "Media", 3: "Difícil" };
+                const dificultadMap: Record<number, string> = { 1: "Fácil", 2: "Media", 3: "Difícil",4: "Custom" };
 
                 setStats({
                     avgTime: timeString,
@@ -85,8 +85,20 @@ export default function StatsPage() {
     };
 
     const getDifficultyBadge = (level: string) => {
-        const styles = level === "Difícil" ? "bg-red-500" : level === "Media" ? "bg-yellow-500" : "bg-green-500";
-        return <span className={`${styles} text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide`}>{level}</span>;
+        const colorMap: Record<string, string> = {
+            "Difícil": "bg-red-500",
+            "Media": "bg-yellow-500",
+            "Fácil": "bg-green-500",
+            "Custom": "bg-purple-600",
+        };
+
+        const styles = colorMap[level] || "bg-gray-500";
+
+        return (
+            <span className={`${styles} text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide`}>
+            {level}
+        </span>
+        );
     };
 
     // --- LÓGICA DE PAGINACIÓN ---

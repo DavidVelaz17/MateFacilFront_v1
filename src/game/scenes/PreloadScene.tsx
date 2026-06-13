@@ -59,6 +59,7 @@ export class PreloadScene extends Phaser.Scene{
         this.load.image('mono', '/assets/mono.png');
         this.load.image('jirafa', '/assets/jirafa.png');
         this.load.image('zebra', '/assets/zeb.png');
+        this.load.image('ajolote', '/assets/ajolote.png');
 
         //PERSONAJES EN NARRATIVA MARINA
         this.load.image('cocodrilo', '/assets/coco.png');

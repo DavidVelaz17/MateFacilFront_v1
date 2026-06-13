@@ -360,7 +360,9 @@ export class DifficultyEvaluator {
      */
     public static evaluate(currentDifficulty: number, timeSeconds: number, lives: number, isRestart: boolean): number {
         let shift = 0;
-
+        if (currentDifficulty === 4) {
+            return 4;
+        }
         if (isRestart) {
             // Disminuye la dificultad si el discente reinicia el nivel (derrota)
             shift = -1;

@@ -12,7 +12,7 @@ const PhaserGame = dynamic(() => import('@/components/PhaserGame'), {
 
 export default function PlayPage() {
     const searchParams = useSearchParams();
-    const params = useParams(); // Extrae el ID del discente de la URL (ej. /play/15)
+    const params = useParams();
     const [levelData, setLevelData] = useState<any>(null);
 
     // 1. EFECTO ORIGINAL: Carga la configuración del nivel

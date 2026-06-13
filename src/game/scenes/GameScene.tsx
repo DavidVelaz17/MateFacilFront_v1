@@ -55,17 +55,28 @@ export class GameScene extends Phaser.Scene {
 
             this.currentElement = this.levelData.element || 'tierra';
 
-            this.currentDifficulty = data.dificultad || 2;
+            if (this.levelData.gameMode === 'custom' || this.levelData.mode === 'custom') {
+                this.currentDifficulty = 4;
 
-            const problemasDelNivel = this.levelData.problemas || {};
-            const problemaActual = problemasDelNivel[this.currentDifficulty as keyof typeof problemasDelNivel];
+                this.levelConfig.targetNumbers = (this.levelData.cifras || [])
+                    .filter((c: any) => c !== '').map(Number);
+                this.levelConfig.trapNumbers = (this.levelData.trampas || [])
+                    .filter((c: any) => c !== '').map(Number);
+                this.levelConfig.solution = Number(this.levelData.resultado);
 
-            if (problemaActual) {
-                this.levelConfig.targetNumbers = problemaActual.cifras.map(Number);
-                this.levelConfig.trapNumbers = problemaActual.trampas.map(Number);
-                this.levelConfig.solution = Number(problemaActual.resultado);
             } else {
-                console.warn("No se encontraron problemas para la dificultad:", this.currentDifficulty);
+                this.currentDifficulty = data.dificultad || 2;
+
+                const problemasDelNivel = this.levelData.problemas || {};
+                const problemaActual = problemasDelNivel[this.currentDifficulty as keyof typeof problemasDelNivel];
+
+                if (problemaActual) {
+                    this.levelConfig.targetNumbers = problemaActual.cifras.map(Number);
+                    this.levelConfig.trapNumbers = problemaActual.trampas.map(Number);
+                    this.levelConfig.solution = Number(problemaActual.resultado);
+                } else {
+                    console.warn("No se encontraron problemas para la dificultad:", this.currentDifficulty);
+                }
             }
 
             this.levelConfig.platformCount = this.levelConfig.targetNumbers.length + this.levelConfig.trapNumbers.length + 2;

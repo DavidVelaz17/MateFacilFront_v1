@@ -134,7 +134,7 @@ export const LevelsTierra: LevelConfig[] = [
         operation: 'resta',
         timeLimit: 120,
         type: 'prueba',
-        bgKey: 'zebra',//TODO cambiar el fondo cuando esté listo el estanque de ajolotes
+        bgKey: 'ajolote',
         introText: 'Arquímedes, que bien que encontraste el camino de vuelta a casa. ' +
             'Antes de pasar, necesito que me des la contraseña, podrías ser un impostor. ' +
             'Tienes un tiempo límite de 2 minutos.',
@@ -273,7 +273,7 @@ export const LevelsAgua: LevelConfig[] = [
         operation: 'division',
         timeLimit: 120,
         type: 'prueba',
-        bgKey: 'pingu', //TODO cambiar el fondo cuando esté listo el estanque de ajolotes
+        bgKey: 'ajolote',
         introText: 'Arquímedes, que bien que encontraste el camino de vuelta a casa. ' +
             'Antes de pasar, necesito que me des la contraseña, podrías ser un impostor. ' +
             'Tienes un tiempo límite de 2 minutos.',
