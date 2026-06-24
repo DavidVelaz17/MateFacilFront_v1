@@ -3,19 +3,19 @@ import * as Phaser from 'phaser';
 export const MapConfig = {
     // Coordenadas de los puntos del Mapa Tierra
     pointDataTierra: [
-        { x: 172, y: 519 }, // Punto 1
-        { x: 252, y: 209 }, // Punto 2
-        { x: 379, y: 407 }, // Punto 3
-        { x: 516, y: 495 }, // Punto 4
-        { x: 692, y: 211 } // Punto 5
+        { x: 190, y: 580 }, // Punto 1
+        { x: 280, y: 230 }, // Punto 2
+        { x: 425, y: 450 }, // Punto 3
+        { x: 580, y: 560 }, // Punto 4
+        { x: 750, y: 220 } // Punto 5
     ],
     // Coordenadas de los puntos del Mapa Agua
     pointDataAgua: [
-        { x: 103, y: 520 }, // Punto 1
-        { x: 276, y: 169 }, // Punto 2
-        { x: 364, y: 314 }, // Punto 3
-        { x: 623, y: 464 },  // Punto 4
-        { x: 633, y: 206 }  //Punto 5
+        { x: 120, y: 580 }, // Punto 1
+        { x: 300, y: 180 }, // Punto 2
+        { x: 394, y: 344 }, // Punto 3
+        { x: 683, y: 504 },  // Punto 4 X+20
+        { x: 700, y: 236 }  //Punto 5
     ]
 };
 
@@ -262,7 +262,8 @@ export class UIFacade {
             EventBus.off('updateLives', updateLivesHandler, this);
         });
     }
-    public createBottomBar(gameWidth: number, gameHeight: number, barHeight: number, barBgKey: any, currentLives: number = 3) {
+    public createBottomBar(gameWidth: number, gameHeight: number, barHeight: number, barBgKey: any,
+                           currentLives: number = 3,totalStars: number = 0) {
         const playableHeight = gameHeight - barHeight;
         const barCenterY = playableHeight + (barHeight / 2);
 
@@ -295,7 +296,7 @@ export class UIFacade {
             .setOrigin(0.5, 0.5)
             .setDepth(200);
 
-        this.coinsText = this.scene.add.text(leftPanelX, barCenterY + 25, 'Estrellas: 0', style)
+        this.coinsText = this.scene.add.text(leftPanelX, barCenterY + 25, `Estrellas: ${totalStars}`, style)
             .setOrigin(0.5, 0.5)
             .setDepth(200);
 

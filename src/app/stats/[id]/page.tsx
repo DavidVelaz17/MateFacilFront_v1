@@ -1,8 +1,8 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import axios from "axios";
-// Agregamos ChevronLeft y ChevronRight para los botones de paginación
+import api from "@/config/api";
+
 import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function StatsPage() {
@@ -18,8 +18,6 @@ export default function StatsPage() {
     });
 
     const [isLoading, setIsLoading] = useState(true);
-
-    // --- NUEVOS ESTADOS PARA PAGINACIÓN ---
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
@@ -27,7 +25,7 @@ export default function StatsPage() {
         const fetchStats = async () => {
             try {
                 const token = localStorage.getItem("token");
-                const response = await axios.get(`http://localhost:3001/discentes/${params.id}/stats`, {
+                const response = await api.get(`/discentes/${params.id}/stats`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
@@ -45,7 +43,6 @@ export default function StatsPage() {
                     attempts: data.attempts,
                     topEmotion: emocionesMap[data.topEmotion] || "Feliz",
                     difficulty: dificultadMap[data.difficulty] || "Fácil",
-                    // Asumimos que data.recentSessions ahora trae TODOS los registros desde el backend
                     recentSessions: data.recentSessions.map((session: any) => {
                         const dateObj = new Date(session.fecha);
                         const formattedDate = dateObj.toLocaleString('es-MX', {
@@ -83,7 +80,20 @@ export default function StatsPage() {
             default: return "text-gray-600 bg-gray-100";
         }
     };
-
+    const getAvatarSrc = (emotion: string): string => {
+        switch (emotion) {
+            case "Feliz":
+                return "/assets/avatar_feliz.png";
+            case "Muy Feliz":
+                return "/assets/avatar_muyfeliz.png";
+            case "Frustrado":
+                return "/assets/avatar_triste.png";
+            case "Enojo":
+                return "assets/avatar_muytriste.png";
+            default:
+                return "/assets/avatar_normal.png";
+        }
+    };
     const getDifficultyBadge = (level: string) => {
         const colorMap: Record<string, string> = {
             "Difícil": "bg-red-500",
@@ -165,8 +175,12 @@ export default function StatsPage() {
                                 {stats.topEmotion}
                             </h3>
                         </div>
-                        <div className="p-3 bg-pink-50 rounded-lg text-pink-500 shrink-0">
-                            <Smile size={24} />
+                        <div className="w-16 h-16 rounded-full overflow-hidden border border-gray-100 bg-slate-50 flex items-center justify-center shrink-0 shadow-inner">
+                            <img
+                                src={getAvatarSrc(stats.topEmotion)}
+                                alt={`Avatar ${stats.topEmotion}`}
+                                className="w-full h-full object-cover"
+                            />
                         </div>
                     </div>
                 </div>

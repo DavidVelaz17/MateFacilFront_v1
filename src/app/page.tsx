@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import axios from "axios";
+import api from "@/config/api";
 import { jwtDecode } from "jwt-decode";
 
 // Interfaz para saber que trae el token
@@ -28,7 +28,7 @@ export default function Login() {
 
         try {
             // Peticion real a tu backend en NestJS
-            const response = await axios.post("http://localhost:3001/auth/login", {
+            const response = await api.post("/auth/login", {
                 usuario: username,
                 password: password
             });
