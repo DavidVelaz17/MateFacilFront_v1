@@ -6,6 +6,7 @@ import {
     Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut
 } from "lucide-react";
 import IconButton from "../components/IconButton";
+import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { useRouter } from "next/navigation";
 import api from "@/config/api";
 
@@ -75,6 +76,10 @@ export default function Dashboard() {
         Apellido_Materno_Discente: ""
     });
 
+    // Estados para el modal de confirmacion de borrado de alumno
+    const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+    const [isDeletingStudent, setIsDeletingStudent] = useState(false);
+
     // --- ESTADOS DE GRUPOS ---
     const [groups, setGroups] = useState<Group[]>([]);
     const [isGroupsSidebarOpen, setIsGroupsSidebarOpen] = useState(true);
@@ -83,6 +88,10 @@ export default function Dashboard() {
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
     const [editingGroup, setEditingGroup] = useState<Group | null>(null);
     const [groupFormData, setGroupFormData] = useState({ Nombre_Grupo: "", Año: "", Grado: "" });
+
+    // Estados para el modal de confirmacion de borrado de grupo
+    const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
+    const [isDeletingGroup, setIsDeletingGroup] = useState(false);
 
     //  AUTENTICACION
     useEffect(() => {
@@ -228,13 +237,22 @@ export default function Dashboard() {
         }
     };
 
-    const handleDeleteStudent = async (id_discente: number) => {
-        if(!confirm("¿Estás seguro de eliminar este alumno?")) return;
+    const handleDeleteStudent = (student: Student) => {
+        setStudentToDelete(student);
+    };
+
+    const confirmDeleteStudent = async () => {
+        if (!studentToDelete) return;
+        setIsDeletingStudent(true);
         try {
-            await api.delete(`/discentes/${id_discente}`);
+            await api.delete(`/discentes/${studentToDelete.id_discente}`);
+            setStudentToDelete(null);
             fetchStudents();
         } catch (error) {
             console.error("Error al eliminar alumno", error);
+            alert("Hubo un error al eliminar el alumno. Revisa la consola del backend.");
+        } finally {
+            setIsDeletingStudent(false);
         }
     };
 
@@ -283,16 +301,24 @@ export default function Dashboard() {
         }
     };
 
-    const handleDeleteGroup = async (e: React.MouseEvent, id_grupo: number) => {
+    const handleDeleteGroup = (e: React.MouseEvent, group: Group) => {
         e.stopPropagation();
-        if(confirm("¿Eliminar este grupo completo? Se perderá el acceso a sus alumnos.")) {
-            try {
-                await api.delete(`/groups/${id_grupo}`);
-                if (activeGroupId === id_grupo) setActiveGroupId(null);
-                fetchGroups();
-            } catch (error) {
-                console.error("Error al eliminar grupo", error);
-            }
+        setGroupToDelete(group);
+    };
+
+    const confirmDeleteGroup = async () => {
+        if (!groupToDelete) return;
+        setIsDeletingGroup(true);
+        try {
+            await api.delete(`/groups/${groupToDelete.id_grupo}`);
+            if (activeGroupId === groupToDelete.id_grupo) setActiveGroupId(null);
+            setGroupToDelete(null);
+            fetchGroups();
+        } catch (error) {
+            console.error("Error al eliminar grupo", error);
+            alert("Hubo un error al eliminar el grupo. Revisa la consola del backend.");
+        } finally {
+            setIsDeletingGroup(false);
         }
     };
 
@@ -359,7 +385,7 @@ export default function Dashboard() {
                                                 <Edit2 size={14}/>
                                             </button>
                                             <button
-                                                onClick={(e) => handleDeleteGroup(e, group.id_grupo)}
+                                                onClick={(e) => handleDeleteGroup(e, group)}
                                                 className="p-1.5 hover:bg-gray-700 rounded text-gray-400 hover:text-red-400"
                                             >
                                                 <Trash size={14}/>
@@ -437,7 +463,7 @@ export default function Dashboard() {
                                             <td className="py-4 px-6 text-center">
                                                 <div className="flex item-center justify-center gap-3">
                                                     <IconButton icon={<Edit size={18} />} label="Modificar" onClick={() => handleOpenEditStudent(student)} color="text-blue-500" />
-                                                    <IconButton icon={<Trash2 size={18} />} label="Eliminar" onClick={() => handleDeleteStudent(student.id_discente)} color="text-red-500" />
+                                                    <IconButton icon={<Trash2 size={18} />} label="Eliminar" onClick={() => handleDeleteStudent(student)} color="text-red-500" />
                                                     <IconButton
                                                         icon={<Play size={18} />}
                                                         label="Jugar"
@@ -827,6 +853,44 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* ================= MODAL DE CONFIRMACIÓN DE BORRADO DE ALUMNO ================= */}
+            {studentToDelete && (
+                <ConfirmDeleteModal
+                    title="Eliminar Alumno"
+                    isDeleting={isDeletingStudent}
+                    onConfirm={confirmDeleteStudent}
+                    onCancel={() => setStudentToDelete(null)}
+                    message={
+                        <>
+                            ¿Estás seguro de que deseas eliminar a{" "}
+                            <span className="font-semibold">
+                                {studentToDelete.Nombre_Discente} {studentToDelete.Apellido_Paterno_Discente}
+                            </span>{" "}
+                            del sistema? Esta acción no se puede deshacer.
+                        </>
+                    }
+                />
+            )}
+
+            {/* ================= MODAL DE CONFIRMACIÓN DE BORRADO DE GRUPO ================= */}
+            {groupToDelete && (
+                <ConfirmDeleteModal
+                    title="Eliminar Grupo"
+                    isDeleting={isDeletingGroup}
+                    onConfirm={confirmDeleteGroup}
+                    onCancel={() => setGroupToDelete(null)}
+                    message={
+                        <>
+                            ¿Estás seguro de que deseas eliminar el grupo{" "}
+                            <span className="font-semibold">
+                                {groupToDelete.Grado}° - {groupToDelete.Nombre_Grupo}
+                            </span>
+                            ? Se perderá el acceso a sus alumnos. Esta acción no se puede deshacer.
+                        </>
+                    }
+                />
             )}
         </div>
     );

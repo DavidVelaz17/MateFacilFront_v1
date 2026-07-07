@@ -3,10 +3,11 @@ import { useState, useEffect } from "react";
 import api from "@/config/api";
 import { Edit, Trash2, Plus, X, ShieldAlert, Users, LogOut } from "lucide-react";
 import IconButton from "../components/IconButton";
+import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { useRouter } from "next/navigation";
 
 interface Teacher {
-    id: number;
+    id_docente: number;
     Nombre_Docente: string;
     Apellido_Paterno_Docente: string;
     Apellido_Materno_Docente: string;
@@ -21,6 +22,11 @@ export default function AdminDashboard() {
     const [teachers, setTeachers] = useState<Teacher[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+
+    // Estados para el modal de confirmacion de borrado
+    const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
+    const [deleteImpact, setDeleteImpact] = useState<{ groupsCount: number; groupNames: string[]; studentsCount: number } | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [formData, setFormData] = useState({
         Nombre_Docente: "",
@@ -87,7 +93,7 @@ export default function AdminDashboard() {
         try {
             if (editingTeacher) {
                 // MODO EDICIÓN
-                await api.patch(`/teachers/${editingTeacher.id}`, formData);
+                await api.patch(`/teachers/${editingTeacher.id_docente}`, formData);
             } else {
                 // MODO CREACIÓN
                 await api.post("/teachers", formData);
@@ -100,13 +106,30 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleDelete = async (id: number) => {
-        if(!confirm("¿Estás seguro de eliminar a este docente del sistema?")) return;
+    const handleDelete = async (teacher: Teacher) => {
         try {
-            await api.delete(`/teachers/${id}`);
+            const response = await api.get(`/teachers/${teacher.id_docente}/delete-impact`);
+            setDeleteImpact(response.data);
+        } catch (error) {
+            console.error("Error al consultar el impacto de la eliminación:", error);
+            setDeleteImpact({ groupsCount: 0, groupNames: [], studentsCount: 0 });
+        }
+        setTeacherToDelete(teacher);
+    };
+
+    const confirmDelete = async () => {
+        if (!teacherToDelete) return;
+        setIsDeleting(true);
+        try {
+            await api.delete(`/teachers/${teacherToDelete.id_docente}`);
+            setTeacherToDelete(null);
+            setDeleteImpact(null);
             fetchTeachers(); // Recargar la tabla sin el docente eliminado
         } catch (error) {
             console.error("Error al eliminar docente:", error);
+            alert("Hubo un error al eliminar el docente. Revisa la consola del backend.");
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -176,9 +199,8 @@ export default function AdminDashboard() {
                                 <tr><td colSpan={3} className="text-center py-8 text-gray-500 italic">Cargando datos o no hay docentes registrados</td></tr>
                             ) : (
                                 teachers.map((teacher) => (
-                                    <tr key={teacher.id} className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
+                                    <tr key={teacher.id_docente} className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
                                         <td className="py-4 px-6 text-left font-medium">
-                                            {/* CORRECCIÓN: Usando las propiedades exactas de la interfaz Teacher */}
                                             {teacher.Apellido_Paterno_Docente} {teacher.Apellido_Materno_Docente} {teacher.Nombre_Docente}
                                         </td>
                                         <td className="py-4 px-6 text-left">
@@ -189,7 +211,7 @@ export default function AdminDashboard() {
                                         <td className="py-4 px-6 text-center">
                                             <div className="flex item-center justify-center gap-3">
                                                 <IconButton icon={<Edit size={18} />} label="Modificar" onClick={() => handleOpenEdit(teacher)} color="text-blue-500" />
-                                                <IconButton icon={<Trash2 size={18} />} label="Eliminar" onClick={() => handleDelete(teacher.id)} color="text-red-500" />
+                                                <IconButton icon={<Trash2 size={18} />} label="Eliminar" onClick={() => handleDelete(teacher)} color="text-red-500" />
                                             </div>
                                         </td>
                                     </tr>
@@ -225,12 +247,10 @@ export default function AdminDashboard() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Paterno</label>
-                                        {/* CORRECCIÓN: value y onChange actualizados */}
                                         <input value={formData.Apellido_Paterno_Docente} onChange={(e) => setFormData({...formData, Apellido_Paterno_Docente: e.target.value})} className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none text-gray-900 bg-white" required />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Materno</label>
-                                        {/* CORRECCIÓN: value y onChange actualizados */}
                                         <input value={formData.Apellido_Materno_Docente} onChange={(e) => setFormData({...formData, Apellido_Materno_Docente: e.target.value})} className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none text-gray-900 bg-white" required />
                                     </div>
                                 </div>
@@ -238,14 +258,12 @@ export default function AdminDashboard() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-1">Usuario</label>
-                                        {/* CORRECCIÓN: value y onChange apuntan a Usuario */}
                                         <input value={formData.Usuario} onChange={(e) => setFormData({...formData, Usuario: e.target.value})} className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900 bg-slate-50 font-mono text-sm" placeholder="ej. perez.juan" required />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-1">
                                             Contraseña {editingTeacher && <span className="text-xs text-gray-400 font-normal">(Vacío = no cambiar)</span>}
                                         </label>
-                                        {/* CORRECCIÓN: value y onChange apuntan a Password */}
                                         <input type="password" value={formData.Password} onChange={(e) => setFormData({...formData, Password: e.target.value})} className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900 bg-white" placeholder="******" required={!editingTeacher} />
                                     </div>
                                 </div>
@@ -259,6 +277,35 @@ export default function AdminDashboard() {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {/* ================= MODAL DE CONFIRMACIÓN DE BORRADO ================= */}
+            {teacherToDelete && (
+                <ConfirmDeleteModal
+                    title="Eliminar Docente"
+                    isDeleting={isDeleting}
+                    onConfirm={confirmDelete}
+                    onCancel={() => { setTeacherToDelete(null); setDeleteImpact(null); }}
+                    message={
+                        <>
+                            ¿Estás seguro de que deseas eliminar a{" "}
+                            <span className="font-semibold">
+                                {teacherToDelete.Nombre_Docente} {teacherToDelete.Apellido_Paterno_Docente}
+                            </span>{" "}
+                            del sistema? Esta acción no se puede deshacer.
+                        </>
+                    }
+                    extraContent={
+                        deleteImpact && deleteImpact.groupsCount > 0 && (
+                            <p className="mt-3 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3">
+                                Este docente tiene <span className="font-bold">{deleteImpact.groupsCount}</span> grupo(s)
+                                {deleteImpact.groupNames.length > 0 && <> ({deleteImpact.groupNames.join(", ")})</>} con{" "}
+                                <span className="font-bold">{deleteImpact.studentsCount}</span> alumno(s) vinculado(s).
+                                Se eliminarán esos grupos y se desvincularán sus alumnos.
+                            </p>
+                        )
+                    }
+                />
             )}
         </div>
     );
