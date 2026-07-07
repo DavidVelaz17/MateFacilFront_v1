@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import axios from "axios";
+import api from "@/config/api";
 import { Edit, Trash2, Plus, X, ShieldAlert, Users, LogOut } from "lucide-react";
 import IconButton from "../components/IconButton";
 import { useRouter } from "next/navigation";
@@ -42,7 +42,7 @@ export default function AdminDashboard() {
         }
 
         // Configura Axios para enviar el token en la peticion POST y GET
-        axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
         // Una vez configurado el token, ya podemos solicitar los docentes
         fetchTeachers();
@@ -51,7 +51,7 @@ export default function AdminDashboard() {
     // --- MANEJADORES DE BASE DE DATOS (AXIOS) ---
     const fetchTeachers = async () => {
         try {
-            const response = await axios.get("http://localhost:3001/teachers");
+            const response = await api.get("/teachers");
             setTeachers(response.data);
         } catch (error) {
             console.error("Error al cargar docentes desde la BD:", error);
@@ -87,10 +87,10 @@ export default function AdminDashboard() {
         try {
             if (editingTeacher) {
                 // MODO EDICIÓN
-                await axios.patch(`http://localhost:3001/teachers/${editingTeacher.id}`, formData);
+                await api.patch(`/teachers/${editingTeacher.id}`, formData);
             } else {
                 // MODO CREACIÓN
-                await axios.post("http://localhost:3001/teachers", formData);
+                await api.post("/teachers", formData);
             }
             setIsModalOpen(false);
             fetchTeachers(); // Recargar la tabla con los datos nuevos
@@ -103,7 +103,7 @@ export default function AdminDashboard() {
     const handleDelete = async (id: number) => {
         if(!confirm("¿Estás seguro de eliminar a este docente del sistema?")) return;
         try {
-            await axios.delete(`http://localhost:3001/teachers/${id}`);
+            await api.delete(`/teachers/${id}`);
             fetchTeachers(); // Recargar la tabla sin el docente eliminado
         } catch (error) {
             console.error("Error al eliminar docente:", error);

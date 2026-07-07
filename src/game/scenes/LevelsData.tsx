@@ -75,8 +75,8 @@ export const LevelsTierra: LevelConfig[] = [
         operation: 'resta',
         type: 'repaso',
         bgKey: 'jirafa',
-        introText: 'Holaaa muuuchooo gustooo, ' +
-            'quiereees queee teee bajeee unaaa hojitaaa deee Acaciaaa? ' +
+        introText: 'Holaaa mchooo gustooo, ' +
+            'quieres que te baje una hojita de Acaciaaa? ' +
             'Aquí esta tu hojita de acacia, saben muy ricas y son muy nutritivas. ' +
             '¿Me podrías ayudar a contar las manchas que tengo en el cuello, ' +
             'pero sin contar las que están en mi cuerpo por favor?',
@@ -105,10 +105,10 @@ export const LevelsTierra: LevelConfig[] = [
         operation: 'resta',
         type: 'repaso',
         bgKey: 'zebra',
-        introText: 'Bienvenido a mi reino compadre, tiene mucho que no veo a alguien por aquí. ' +
+        introText: 'Bienvenido a mi reino, tiene mucho que no veo a alguien por aquí. ' +
             'Verás, quiero que cuentes las rayas de mi cuerpo, pero no las rayas de mi cabeza ' +
             'para saber si soy una cebra negra con rayas blancas o una cebra blanca con rayas negras. ' +
-            'Sé que puedes hacerlo con facilidad compadre.',
+            'Sé que puedes hacerlo con facilidad.',
         successText: 'Muchas gracias compadre, ' +
             'que alivio que soy diferente al resto de cebras. ' +
             'Visítame pronto vecino. ',
@@ -134,7 +134,7 @@ export const LevelsTierra: LevelConfig[] = [
         operation: 'resta',
         timeLimit: 120,
         type: 'prueba',
-        bgKey: 'zebra',//TODO cambiar el fondo cuando esté listo el estanque de ajolotes
+        bgKey: 'ajolote',
         introText: 'Arquímedes, que bien que encontraste el camino de vuelta a casa. ' +
             'Antes de pasar, necesito que me des la contraseña, podrías ser un impostor. ' +
             'Tienes un tiempo límite de 2 minutos.',
@@ -273,7 +273,7 @@ export const LevelsAgua: LevelConfig[] = [
         operation: 'division',
         timeLimit: 120,
         type: 'prueba',
-        bgKey: 'pingu', //TODO cambiar el fondo cuando esté listo el estanque de ajolotes
+        bgKey: 'ajolote',
         introText: 'Arquímedes, que bien que encontraste el camino de vuelta a casa. ' +
             'Antes de pasar, necesito que me des la contraseña, podrías ser un impostor. ' +
             'Tienes un tiempo límite de 2 minutos.',

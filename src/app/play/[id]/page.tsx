@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import {useParams, useSearchParams} from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {EventBus} from "@/game/scenes/patterns";
-import axios from "axios";
+import api from "@/config/api";
 
 const PhaserGame = dynamic(() => import('@/components/PhaserGame'), {
     ssr: false,
@@ -12,27 +12,41 @@ const PhaserGame = dynamic(() => import('@/components/PhaserGame'), {
 
 export default function PlayPage() {
     const searchParams = useSearchParams();
-    const params = useParams(); // Extrae el ID del discente de la URL (ej. /play/15)
+    const params = useParams();
     const [levelData, setLevelData] = useState<any>(null);
 
     // 1. EFECTO ORIGINAL: Carga la configuración del nivel
     useEffect(() => {
-        const mode = searchParams.get('mode');
-        const configString = searchParams.get('config');
+        const fetchInitialData = async () => {
+            const mode = searchParams.get('mode');
+            const configString = searchParams.get('config');
+            const initialPhaserData = {
+                mode: mode,
+                config: null as any,
+                totalStars: 0
+            };
 
-        const initialPhaserData = {
-            mode: mode,
-            config: null as any
+            if (mode === 'custom' && configString) {
+                initialPhaserData.config = JSON.parse(decodeURIComponent(configString));
+            }
+            try {
+                const token = localStorage.getItem('token');
+                if (token && params.id) {
+                    const statsRes = await api.get(`/discentes/${params.id}/stats`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+
+                    initialPhaserData.totalStars = statsRes.data.totalStars || 0;
+                    console.log("Estrellas históricas cargadas:", initialPhaserData.totalStars);
+                }
+            } catch (error) {
+                console.error("No se pudo cargar el historial de estrellas:", error);
+            }
+            setLevelData(initialPhaserData);
         };
+        fetchInitialData();
+    }, [searchParams, params.id]);
 
-        if (mode === 'custom' && configString) {
-            initialPhaserData.config = JSON.parse(decodeURIComponent(configString));
-        }
-        setLevelData(initialPhaserData);
-
-    }, [searchParams]);
-
-    // 2. NUEVO EFECTO: Escucha al EventBus de Phaser y envía a NestJS
     useEffect(() => {
         const handleGameOverStats = async (stats: any) => {
             const idDiscente = params.id;
@@ -52,8 +66,8 @@ export default function PlayPage() {
                 console.log("Atrapando estadísticas desde Phaser:", stats);
 
                 // Envío de las estadísticas procesadas al backend
-                await axios.post(
-                    `http://localhost:3001/discentes/${idDiscente}/attempts`,
+                await api.post(
+                    `/discentes/${idDiscente}/attempts`,
                     stats,
                     {
                         headers: { Authorization: `Bearer ${token}` }
@@ -87,7 +101,7 @@ export default function PlayPage() {
                     Volver al Panel
                 </button>
             </div>
-            <div className="relative w-[800px] h-[600px] bg-black border-4 border-gray-600 rounded-lg shadow-2xl overflow-hidden">
+            <div className="relative w-full max-w-4xl aspect-[4/3] bg-black border-4 border-gray-600 rounded-lg shadow-2xl overflow-hidden">
                 {levelData && <PhaserGame levelData={levelData} />}
             </div>
         </div>

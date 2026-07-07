@@ -11,6 +11,7 @@ export class MapScene extends Phaser.Scene {
     private playerNode: Phaser.GameObjects.Arc | null = null;
     private playerAvatar: Phaser.GameObjects.Sprite | null = null;
     private justWon: boolean = false;
+    private totalStars: number = 0;
 
     constructor() {
         super('MapScene');
@@ -22,6 +23,7 @@ export class MapScene extends Phaser.Scene {
             this.currentElement = data.config.element || data.config.selectedElement || 'tierra';
         }
         this.justWon = data && data.win ? true : false;
+        this.totalStars = this.registry.get('totalStars') || 0;
 
         // Conservamos la dificultad si viene heredada desde GameScene, si no, inicia en Normal (2)
         if (data && data.dificultad !== undefined) {
@@ -77,7 +79,7 @@ export class MapScene extends Phaser.Scene {
                 if (this.currentElement === 'tierra') MapScene.currentLevelPointTierra = 0;
                 else MapScene.currentLevelPointAgua = 0;
 
-                this.scene.restart({ config: this.levelData });
+                this.scene.restart({ config: this.levelData, totalStars: this.totalStars });
             } else {
                 const currentIndexFresh = this.currentElement === 'tierra'
                     ? MapScene.currentLevelPointTierra
@@ -93,7 +95,7 @@ export class MapScene extends Phaser.Scene {
                     message: finalLevelData.introText,
                     bg: finalLevelData.bgKey,
                     // Inyectamos la dificultad en nextData para que GameScene la reciba
-                    nextData: { config: finalLevelData, mode: 'historia', dificultad: currentDiff }
+                    nextData: { config: finalLevelData, mode: 'historia', dificultad: currentDiff, totalStars: this.totalStars }
                 });
             }
         });
@@ -105,7 +107,7 @@ export class MapScene extends Phaser.Scene {
         returnButton.on('pointerout', () => returnButton.setTexture('btn_menu_0'));
         returnButton.on('pointerdown', () => {
             const finalLevelData = this.prepareLevelData(currentPointIndex);
-            this.scene.start('MainMenuScene', { config: finalLevelData, mode: 'historia' });
+            this.scene.start('MainMenuScene', { config: finalLevelData, mode: 'historia', totalStars: this.totalStars });
         });
 
         audioManager(this, 'bg_map');

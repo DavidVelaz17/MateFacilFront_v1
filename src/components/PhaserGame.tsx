@@ -29,9 +29,15 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                 parent: containerRef.current,
                 width: 800,
                 height: 600,
+                scale: {
+                    mode: Phaser.Scale.FIT,
+                    autoCenter: Phaser.Scale.CENTER_BOTH,
+                    width: '100%',
+                    height: '100%'
+                },
                 physics: {
                     default: 'arcade',
-                    arcade: { gravity: { y: 800 }, debug: false }
+                    arcade: { gravity: { x: 0 ,y: 800 }, debug: false }
                 },
                 transparent: true
             };
@@ -48,12 +54,14 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                 setTimeout(() => {
                     if (gameRef.current) {
                         console.log("React: Arrancando motor con datos ->", levelData);
+                        gameRef.current.registry.set('totalStars', levelData.totalStars || 0);
                         gameRef.current.scene.start('PreloadScene', { config: levelData });
                     }
                 }, 100);
             }
             else if (levelData) {
                 console.log("React: Reiniciando motor por nuevos datos ->", levelData);
+                gameRef.current.registry.set('totalStars', levelData.totalStars || 0);
                 const sceneManager = gameRef.current.scene;
                 sceneManager.getScenes(true).forEach(scene => scene.scene.stop());
                 sceneManager.start('PreloadScene', { config: levelData });

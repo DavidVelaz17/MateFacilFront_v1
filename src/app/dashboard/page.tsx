@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import IconButton from "../components/IconButton";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import api from "@/config/api";
 
 // --- INTERFACES ---
 interface Group {
@@ -22,7 +22,7 @@ interface Student {
     Nombre_Discente: string;
     Apellido_Paterno_Discente: string;
     Apellido_Materno_Discente: string;
-    grupos?: Group[]; // CORRECCIÓN: Ahora el alumno sabe a qué grupos pertenece
+    grupos?: Group[];
 }
 
 interface GameConfig {
@@ -84,8 +84,7 @@ export default function Dashboard() {
     const [editingGroup, setEditingGroup] = useState<Group | null>(null);
     const [groupFormData, setGroupFormData] = useState({ Nombre_Grupo: "", Año: "", Grado: "" });
 
-    // 1. EFECTO DE AUTENTICACION (Se ejecuta solo al montar el componente)
-// 1. EFECTO DE AUTENTICACION
+    //  AUTENTICACION
     useEffect(() => {
         const token = localStorage.getItem("token");
 
@@ -98,7 +97,7 @@ export default function Dashboard() {
         }
 
         // Configura Axios para que todas las peticiones lleven el token
-        axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
         try {
             // Decodifica el token para obtener el ID del docente
@@ -117,7 +116,7 @@ export default function Dashboard() {
             console.error("Bloqueo de seguridad: Token corrupto o invalido.", error);
             // Expulsamos al usuario y limpiamos la basura
             localStorage.removeItem("token");
-            delete axios.defaults.headers.common["Authorization"];
+            delete api.defaults.headers.common["Authorization"];
             router.push("/");
         }
     }, [router]);
@@ -164,7 +163,7 @@ export default function Dashboard() {
 
     const fetchStudents = async () => {
         try {
-            const res = await axios.get("http://localhost:3001/discentes");
+            const res = await api.get("/discentes");
             setStudents(res.data);
         } catch (error) {
             console.error("Error al cargar alumnos", error);
@@ -173,7 +172,7 @@ export default function Dashboard() {
 
     const fetchGroups = async () => {
         try {
-            const res = await axios.get("http://localhost:3001/groups");
+            const res = await api.get("/groups");
             setGroups(res.data);
             if (res.data.length > 0 && !activeGroupId) {
                 setActiveGroupId(res.data[0].id_grupo);
@@ -217,9 +216,9 @@ export default function Dashboard() {
 
         try {
             if (editingStudent) {
-                await axios.patch(`http://localhost:3001/discentes/${editingStudent.id_discente}`, payload);
+                await api.patch(`/discentes/${editingStudent.id_discente}`, payload);
             } else {
-                await axios.post("http://localhost:3001/discentes", payload);
+                await api.post("/discentes", payload);
             }
             setIsStudentModalOpen(false);
             fetchStudents();
@@ -232,7 +231,7 @@ export default function Dashboard() {
     const handleDeleteStudent = async (id_discente: number) => {
         if(!confirm("¿Estás seguro de eliminar este alumno?")) return;
         try {
-            await axios.delete(`http://localhost:3001/discentes/${id_discente}`);
+            await api.delete(`/discentes/${id_discente}`);
             fetchStudents();
         } catch (error) {
             console.error("Error al eliminar alumno", error);
@@ -272,9 +271,9 @@ export default function Dashboard() {
 
         try {
             if (editingGroup) {
-                await axios.patch(`http://localhost:3001/groups/${editingGroup.id_grupo}`, payload);
+                await api.patch(`/groups/${editingGroup.id_grupo}`, payload);
             } else {
-                await axios.post("http://localhost:3001/groups", payload);
+                await api.post("/groups", payload);
             }
             setIsGroupModalOpen(false);
             fetchGroups();
@@ -288,7 +287,7 @@ export default function Dashboard() {
         e.stopPropagation();
         if(confirm("¿Eliminar este grupo completo? Se perderá el acceso a sus alumnos.")) {
             try {
-                await axios.delete(`http://localhost:3001/groups/${id_grupo}`);
+                await api.delete(`/groups/${id_grupo}`);
                 if (activeGroupId === id_grupo) setActiveGroupId(null);
                 fetchGroups();
             } catch (error) {
@@ -299,7 +298,7 @@ export default function Dashboard() {
 
     const handleLogout = () => {
         localStorage.removeItem("token");
-        delete axios.defaults.headers.common["Authorization"];
+        delete api.defaults.headers.common["Authorization"];
         router.push("/");
     };
 

@@ -46,7 +46,7 @@ export class MainMenuScene extends Phaser.Scene {
             color: '#FFF',
             stroke: '#000',
             strokeThickness: 3
-        }).setOrigin(0.5,27);
+        }).setOrigin(0.5,30);
     }
 
     private handleSelection(element: 'tierra' | 'agua', operationGroup: string) {

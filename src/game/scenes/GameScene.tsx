@@ -16,6 +16,7 @@ export class GameScene extends Phaser.Scene {
     private doorStrategy!: MathStrategy;
     private bgMusic!: Phaser.Sound.BaseSound;
     private currentDifficulty: number = 2;
+    private totalStarsHistorical: number = 0;
 
     private levelData: any = null;
     private currentElement: 'tierra' | 'agua' = 'tierra';
@@ -46,6 +47,7 @@ export class GameScene extends Phaser.Scene {
         this.gameState = { collectedNumbers: [], elapsedTime: 0, lastEmittedTime: 0, doorFailed: false,
             isGameOver: false, isPaused: false, lives: startingLives };
         console.log("4. GameScene inicializado con:", data);
+        this.totalStarsHistorical = this.registry.get('totalStars') || 0;
         if (data && data.config) {
             this.levelData = data.config;
 
@@ -55,17 +57,28 @@ export class GameScene extends Phaser.Scene {
 
             this.currentElement = this.levelData.element || 'tierra';
 
-            this.currentDifficulty = data.dificultad || 2;
+            if (this.levelData.gameMode === 'custom' || this.levelData.mode === 'custom') {
+                this.currentDifficulty = 4;
 
-            const problemasDelNivel = this.levelData.problemas || {};
-            const problemaActual = problemasDelNivel[this.currentDifficulty as keyof typeof problemasDelNivel];
+                this.levelConfig.targetNumbers = (this.levelData.cifras || [])
+                    .filter((c: any) => c !== '').map(Number);
+                this.levelConfig.trapNumbers = (this.levelData.trampas || [])
+                    .filter((c: any) => c !== '').map(Number);
+                this.levelConfig.solution = Number(this.levelData.resultado);
 
-            if (problemaActual) {
-                this.levelConfig.targetNumbers = problemaActual.cifras.map(Number);
-                this.levelConfig.trapNumbers = problemaActual.trampas.map(Number);
-                this.levelConfig.solution = Number(problemaActual.resultado);
             } else {
-                console.warn("No se encontraron problemas para la dificultad:", this.currentDifficulty);
+                this.currentDifficulty = data.dificultad || 2;
+
+                const problemasDelNivel = this.levelData.problemas || {};
+                const problemaActual = problemasDelNivel[this.currentDifficulty as keyof typeof problemasDelNivel];
+
+                if (problemaActual) {
+                    this.levelConfig.targetNumbers = problemaActual.cifras.map(Number);
+                    this.levelConfig.trapNumbers = problemaActual.trampas.map(Number);
+                    this.levelConfig.solution = Number(problemaActual.resultado);
+                } else {
+                    console.warn("No se encontraron problemas para la dificultad:", this.currentDifficulty);
+                }
             }
 
             this.levelConfig.platformCount = this.levelConfig.targetNumbers.length + this.levelConfig.trapNumbers.length + 2;
@@ -88,7 +101,7 @@ export class GameScene extends Phaser.Scene {
             .setDisplaySize(gameWidth, playableHeight);
 
         this.ui = new UIFacade(this);
-        this.ui.createBottomBar(gameWidth, gameHeight, barHeight, barBgKey,this.gameState.lives);
+        this.ui.createBottomBar(gameWidth, gameHeight, barHeight, barBgKey,this.gameState.lives, this.totalStarsHistorical);
         this.ui.createControlButtons(gameWidth);
 
         const builder = new LevelBuilder(this);
@@ -291,7 +304,7 @@ export class GameScene extends Phaser.Scene {
                 btn.on('pointerover', () => btn.setTexture('btn_volver_a_jugar_1'));
                 btn.on('pointerout', () => btn.setTexture('btn_volver_a_jugar_0'));
                 btn.on('pointerdown', () => {
-                    this.scene.restart({ config: this.levelData, lives: this.gameState.lives, dificultad: this.currentDifficulty });
+                    this.scene.restart({ config: this.levelData, lives: this.gameState.lives, dificultad: this.currentDifficulty,totalStars: this.totalStarsHistorical });
                 });
             } else {
                 this.triggerLoss('TE QUEDASTE SIN VIDAS');
@@ -317,6 +330,8 @@ export class GameScene extends Phaser.Scene {
 
         const estrellasObtenidas = this.gameState.lives;
         const tiempoFinal = Math.floor(this.gameState.elapsedTime);
+        this.totalStarsHistorical += estrellasObtenidas;
+        this.registry.set('totalStars', this.totalStarsHistorical);
 
         const nextDifficulty = DifficultyEvaluator.evaluate(this.currentDifficulty, tiempoFinal, estrellasObtenidas, false);
 
@@ -339,7 +354,7 @@ export class GameScene extends Phaser.Scene {
             fontSize: '30px', color: '#ff0', stroke: '#000', strokeThickness: 6
         }).setOrigin(0.5);
 
-        EventBus.emit('updateCoins', estrellasObtenidas);
+        EventBus.emit('updateCoins', this.totalStarsHistorical);
         const isStoryMode = this.levelData && this.levelData.gameMode === 'historia';
 
         if (isStoryMode) {
@@ -353,7 +368,7 @@ export class GameScene extends Phaser.Scene {
                     next: 'MapScene',
                     message: this.levelData.successText,
                     bg: this.levelData.bgKey,
-                    nextData: { win: true, config: this.levelData, dificultad: nextDifficulty }
+                    nextData: { win: true, config: this.levelData, dificultad: nextDifficulty, totalStars: this.totalStarsHistorical }
                 });
             });
         }
@@ -396,7 +411,7 @@ export class GameScene extends Phaser.Scene {
         btn.on('pointerover', () => btn.setTexture('btn_reiniciar_1'));
         btn.on('pointerout', () => btn.setTexture('btn_reiniciar_0'));
         btn.on('pointerdown', () => {
-            this.scene.restart({ config: this.levelData, lives: 3, dificultad: loweredDifficulty });
+            this.scene.restart({ config: this.levelData, lives: 3, dificultad: loweredDifficulty,totalStars: this.totalStarsHistorical });
         });
     }
 }
