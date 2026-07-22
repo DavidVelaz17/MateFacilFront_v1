@@ -49,7 +49,7 @@ export const LevelsTierra: LevelConfig[] = [
         type: 'repaso',
         bgKey: 'mono',
         introText: 'Bienvenido a mi habitad Arquímedes, toma una banana. ' +
-            'Ayúdame a contar as bananas de las pencas que tengo aquí por favor. ' +
+            'Ayúdame a contar las bananas de las pencas que tengo aquí por favor. ' +
             'De esta manera sabré si le puedo convidar a todos mis amigos.',
         successText: 'Perfecto, si me alcanzan las bananas para mis amigos, ' +
             'toma otra banana para tu camino de vuelta a casa amigo.',

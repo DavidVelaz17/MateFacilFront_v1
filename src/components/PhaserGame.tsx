@@ -39,6 +39,9 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                     default: 'arcade',
                     arcade: { gravity: { x: 0 ,y: 800 }, debug: false }
                 },
+                input: {
+                    activePointers: 4
+                },
                 transparent: true
             };
 

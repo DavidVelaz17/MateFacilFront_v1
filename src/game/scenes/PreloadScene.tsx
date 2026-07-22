@@ -79,6 +79,35 @@ export class PreloadScene extends Phaser.Scene{
         this.load.audio('bg_map', '/assets/bg_map.mp3');
         this.load.audio('fanfare', '/assets/fanfare_1.mp3');
 
+        //VOCES DE PERSONAJES
+        //LEON
+        this.load.audio('leonVoiceInit', '/assets/LeonVoiceInit.mp3');
+        this.load.audio('leonVoiceEnd', '/assets/LeonVoiceEnd.mp3');
+        //MONO
+        this.load.audio('monkyVoiceInit', '/assets/MonkyVoiceInit.mp3');
+        this.load.audio('monkyVoiceEnd', '/assets/MonkyVoiceEnd.mp3');
+        //JIRAFA
+        this.load.audio('jirafVoiceInit', '/assets/JirafVoiceInit.mp3');
+        this.load.audio('jirafVoiceEnd', '/assets/JirafVoiceEnd.mp3');
+        //ZEBRA
+        this.load.audio('zebVoiceInit', '/assets/ZebVoiceInit.mp3');
+        this.load.audio('zebVoiceEnd', '/assets/ZebVoiceEnd.mp3');
+        //AJOLOTE
+        this.load.audio('axolotVoiceInit', '/assets/AxolotVoiceInit.mp3');
+        this.load.audio('axolotVoiceEnd', '/assets/AxolotVoiceEnd.mp3');
+        //COCODRILO
+        this.load.audio('cocoVoiceInit', '/assets/CocoVoiceInit.mp3');
+        this.load.audio('cocoVoiceEnd', '/assets/CocoVoiceEnd.mp3');
+        //DELFIN
+        this.load.audio('dolphVoiceInit', '/assets/DolphVoiceInit.mp3');
+        this.load.audio('dolphVoiceEnd', '/assets/DolphVoiceEnd.mp3');
+        //HIPO
+        this.load.audio('hipoVoiceInit', '/assets/HipoVoiceInit.mp3');
+        this.load.audio('hipoVoiceEnd', '/assets/HipoVoiceEnd.mp3');
+        //PINGU
+        this.load.audio('pinguVoiceInit', '/assets/PinguVoiceInit.mp3');
+        this.load.audio('pinguVoiceEnd', '/assets/PinguVoiceEnd.mp3');
+
         this.load.on('loaderror', (fileObj: any) => {
             console.error("Fallo al cargar:", fileObj.src);
         });

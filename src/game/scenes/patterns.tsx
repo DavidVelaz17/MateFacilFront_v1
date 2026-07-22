@@ -380,3 +380,92 @@ export class DifficultyEvaluator {
         return Phaser.Math.Clamp(currentDifficulty + shift, 1, 3);
     }
 }
+
+// ==========================================
+// 7. FACADE - CONTROLES TÁCTILES
+// ==========================================
+export class TouchControls {
+    private scene: Phaser.Scene;
+    public readonly enabled: boolean;
+    private leftDown = false;
+    private rightDown = false;
+    private jumpDown = false;
+    private interactRequested = false;
+
+    constructor(scene: Phaser.Scene, gameWidth: number, playableHeight: number) {
+        this.scene = scene;
+        this.enabled = scene.sys.game.device.input.touch;
+
+        if (!this.enabled) return;
+
+        const radius = 42;
+        const movePadY = playableHeight - 70;
+        // La puerta del nivel vive en la esquina inferior derecha, así que el
+        // clúster de acción se sube para no taparla.
+        const actionPadY = playableHeight - 170;
+
+        this.createButton(80, movePadY, radius, '◀', '30px',
+            () => this.leftDown = true, () => this.leftDown = false);
+        this.createButton(175, movePadY, radius, '▶', '30px',
+            () => this.rightDown = true, () => this.rightDown = false);
+
+        this.createButton(gameWidth - 170, actionPadY, radius, '★', '26px',
+            () => this.interactRequested = true);
+        this.createButton(gameWidth - 70, actionPadY, radius, '▲', '30px',
+            () => this.jumpDown = true, () => this.jumpDown = false);
+    }
+
+    private createButton(
+        x: number, y: number, radius: number, label: string, fontSize: string,
+        onDown: () => void, onUp?: () => void
+    ) {
+        this.scene.add.circle(x, y + 4, radius, 0x000000, 0.25).setDepth(199).setScrollFactor(0);
+
+        const base = this.scene.add.circle(x, y, radius, 0x1f2937, 0.5)
+            .setStrokeStyle(2, 0xffffff, 0.55)
+            .setDepth(200)
+            .setScrollFactor(0)
+            .setInteractive({ useHandCursor: true });
+
+        this.scene.add.text(x, y, label, {
+            fontSize,
+            color: '#ffffff',
+            fontStyle: 'bold'
+        }).setOrigin(0.5).setDepth(201).setScrollFactor(0);
+
+        const press = () => {
+            this.scene.tweens.add({ targets: base, scale: 0.88, duration: 80, ease: 'Quad.easeOut' });
+            base.setFillStyle(0x374151, 0.75);
+            onDown();
+        };
+        const release = () => {
+            this.scene.tweens.add({ targets: base, scale: 1, duration: 100, ease: 'Quad.easeOut' });
+            base.setFillStyle(0x1f2937, 0.5);
+            onUp?.();
+        };
+
+        base.on('pointerdown', press);
+        base.on('pointerup', release);
+        base.on('pointerout', release);
+    }
+
+    isLeftDown(): boolean {
+        return this.leftDown;
+    }
+
+    isRightDown(): boolean {
+        return this.rightDown;
+    }
+
+    isJumpDown(): boolean {
+        return this.jumpDown;
+    }
+
+    consumeInteract(): boolean {
+        if (this.interactRequested) {
+            this.interactRequested = false;
+            return true;
+        }
+        return false;
+    }
+}

@@ -2,7 +2,8 @@ import * as Phaser from 'phaser';
 import {
     EventBus, MathStrategy, EmotionContext,
     SadState, HappyState, LevelBuilder, UIFacade,
-    NumberItem, SuperHappyState, SuperSadState, DifficultyEvaluator
+    NumberItem, SuperHappyState, SuperSadState, DifficultyEvaluator,
+    TouchControls
 } from './patterns';
 import {audioManager} from "@/game/scenes/audioManager";
 
@@ -14,6 +15,7 @@ export class GameScene extends Phaser.Scene {
     private ui!: UIFacade;
     private emotionState!: EmotionContext;
     private doorStrategy!: MathStrategy;
+    private touchControls!: TouchControls;
     private bgMusic!: Phaser.Sound.BaseSound;
     private currentDifficulty: number = 2;
     private totalStarsHistorical: number = 0;
@@ -132,6 +134,7 @@ export class GameScene extends Phaser.Scene {
 
         this.cursors = this.input.keyboard!.createCursorKeys();
         this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        this.touchControls = new TouchControls(this, gameWidth, playableHeight);
 
         let equationString = "? x ? = ?";
 
@@ -220,7 +223,7 @@ export class GameScene extends Phaser.Scene {
         }
 
 
-        if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+        if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || this.touchControls.consumeInteract()) {
             this.physics.overlap(this.player, this.itemsGroup,
                 this.handleItemCollection as
                     Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
@@ -230,11 +233,15 @@ export class GameScene extends Phaser.Scene {
         const body = this.player.body as Phaser.Physics.Arcade.Body;
         const {left, right, up} = this.cursors;
 
-        if (left.isDown){
+        const moveLeft = left.isDown || this.touchControls.isLeftDown();
+        const moveRight = right.isDown || this.touchControls.isRightDown();
+        const jump = up.isDown || this.touchControls.isJumpDown();
+
+        if (moveLeft){
             this.player.setVelocityX(-160);
             this.player.play('walk', true);
             this.player.setFlipX(true);
-        } else if (right.isDown){
+        } else if (moveRight){
             this.player.setVelocityX(160);
             this.player.play('walk', true);
             this.player.setFlipX(false);
@@ -244,7 +251,7 @@ export class GameScene extends Phaser.Scene {
         }
 
         const isGrounded = body.blocked.down || body.touching.down;
-        if (up.isDown && isGrounded) {
+        if (jump && isGrounded) {
             this.player.setVelocityY(-550);
         }
     }
@@ -338,7 +345,7 @@ export class GameScene extends Phaser.Scene {
         const stats = {
             Tiempo: tiempoFinal,
             Dificultad: this.currentDifficulty,
-            Puntos: (this.gameState.collectedNumbers.length * 10) + (estrellasObtenidas * 20),
+            Puntos: (estrellasObtenidas * 20) + this.getTiempoBonus(tiempoFinal),
             Emocion: estrellasObtenidas === 3 ? 3 : 2,
             Monedas: estrellasObtenidas
         };
@@ -395,7 +402,7 @@ export class GameScene extends Phaser.Scene {
         const stats = {
             Tiempo: tiempoFinal,
             Dificultad: this.currentDifficulty,
-            Puntos: this.gameState.collectedNumbers.length * 10,
+            Puntos: 0,
             Emocion: 1,
             Monedas: 0
         };
@@ -413,5 +420,12 @@ export class GameScene extends Phaser.Scene {
         btn.on('pointerdown', () => {
             this.scene.restart({ config: this.levelData, lives: 3, dificultad: loweredDifficulty,totalStars: this.totalStarsHistorical });
         });
+    }
+
+    private getTiempoBonus(tiempoSegundos: number): number {
+        if (tiempoSegundos <= 30) return 40;
+        if (tiempoSegundos <= 60) return 25;
+        if (tiempoSegundos <= 90) return 10;
+        return 0;
     }
 }

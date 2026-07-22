@@ -1,4 +1,4 @@
-export function audioManager(scene: Phaser.Scene, newMusicKey: string) {
+export function audioManager(scene: Phaser.Scene, newMusicKey: string, volume: number = 0.5) {
     const currentMusicKey = scene.registry.get('currentMusicKey');
 
     // 1. Si hay una música diferente sonando, la detenemos
@@ -14,14 +14,19 @@ export function audioManager(scene: Phaser.Scene, newMusicKey: string) {
 
     // 3. Si NO existe (es la primera vez que suena), la agregamos
     if (!newMusic) {
-        newMusic = scene.sound.add(newMusicKey, { loop: true, volume: 0.5 });
+        newMusic = scene.sound.add(newMusicKey, { loop: true, volume });
     }
 
-    // 4. Si existe pero está pausada o detenida (ej. al reiniciar nivel), la iniciamos
+    // 4. Ajustamos el volumen (puede variar según la escena que la invoque, ej. TransitionScene la baja para resaltar las voces)
+    if ('setVolume' in newMusic) {
+        (newMusic as Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound).setVolume(volume);
+    }
+
+    // 5. Si existe pero está pausada o detenida (ej. al reiniciar nivel), la iniciamos
     if (!newMusic.isPlaying) {
         newMusic.play();
     }
 
-    // 5. Actualizamos el registro global
+    // 6. Actualizamos el registro global
     scene.registry.set('currentMusicKey', newMusicKey);
 }
