@@ -289,8 +289,11 @@ export class UIFacade {
         };
 
         // --- POSICIONES X PARA LOS PANELES ---
-        const leftPanelX = gameWidth / 5;
-        const rightPanelX = (3 * gameWidth) / 4;
+        // Centros reales de los recuadros tallados en el asset de la barra
+        // (medidos sobre la imagen: recuadro izquierdo ~22.6% del ancho,
+        // recuadro derecho ~77.3% del ancho).
+        const leftPanelX = gameWidth * 0.226;
+        const rightPanelX = gameWidth * 0.773;
 
         this.livesText = this.scene.add.text(leftPanelX, barCenterY - 25, `Vidas: ${currentLives}`, style)
             .setOrigin(0.5, 0.5)

@@ -68,8 +68,8 @@ export default function Login() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-100">
-            <form onSubmit={handleLogin} className="w-96 bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+        <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4">
+            <form onSubmit={handleLogin} className="w-full max-w-sm bg-white p-8 rounded-xl shadow-lg border border-gray-200">
                 <h1 className="text-2xl font-bold mb-2 text-center text-blue-600">MateFácil</h1>
 
                 {/* Bloque para mostrar errores visuales si falla el login */}

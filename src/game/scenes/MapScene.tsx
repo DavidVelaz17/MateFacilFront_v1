@@ -133,7 +133,7 @@ export class MapScene extends Phaser.Scene {
         }
 
         // Armamos el objeto base. No extraemos cifras, resultado o trampas aquí
-        // porque GameScene las extraerá basándose en la dificultad que reciba.
+        // porque GameScene las genera proceduralmente segun la dificultad que reciba.
         const data: any = {
             element: this.currentElement,
             operation: levelConfig.operation,
@@ -141,8 +141,6 @@ export class MapScene extends Phaser.Scene {
             bgKey: levelConfig.bgKey,
             introText: levelConfig.introText,
             successText: levelConfig.successText,
-            // Pasamos el objeto COMPLETO de problemas para que GameScene elija
-            problemas: levelConfig.problemas
         };
 
         if (levelConfig.timeLimit) {

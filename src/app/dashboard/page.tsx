@@ -1,14 +1,16 @@
 "use client";
 import { useState, useEffect } from "react";
-import { jwtDecode } from "jwt-decode";
+import axios from "axios";
 import {
     Edit, Trash2, Play, BarChart2, Plus, X,
-    Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut
+    Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut, Menu, Loader2
 } from "lucide-react";
 import IconButton from "../components/IconButton";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { useRouter } from "next/navigation";
 import api from "@/config/api";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/components/ToastProvider";
 
 // --- INTERFACES ---
 interface Group {
@@ -39,19 +41,14 @@ interface GameConfig {
     trampas: string[];
 }
 
-interface CustomJwtPayload {
-    sub: number;
-    username: string;
-    name: string;
-    role: string;
-}
-
 export default function Dashboard() {
     const router = useRouter();
-    const [docenteActualId, setDocenteActualId] = useState<number | null>(null);
-    const [docenteName, setDocenteName] = useState<string>("Cargando...");
+    const { docenteId: docenteActualId, docenteName, logout } = useAuth();
+    const { showToast } = useToast();
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     // --- ESTADOS DE ALUMNOS ---
     const [students, setStudents] = useState<Student[]>([]);
+    const [isLoadingStudents, setIsLoadingStudents] = useState(true);
     const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
     const [isPlayModalOpen, setIsPlayModalOpen] = useState(false);
@@ -93,44 +90,7 @@ export default function Dashboard() {
     const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
     const [isDeletingGroup, setIsDeletingGroup] = useState(false);
 
-    //  AUTENTICACION
-    useEffect(() => {
-        const token = localStorage.getItem("token");
-
-        // Proteccion contra nulos o strings "undefined" accidentales
-        if (!token || token === "undefined" || token === "null") {
-            console.warn("Bloqueo de seguridad: No hay un token valido. Redirigiendo al login...");
-            localStorage.removeItem("token");
-            router.push("/");
-            return;
-        }
-
-        // Configura Axios para que todas las peticiones lleven el token
-        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
-        try {
-            // Decodifica el token para obtener el ID del docente
-            const decoded = jwtDecode<CustomJwtPayload>(token);
-
-            // Verificamos que el payload tenga el ID (sub)
-            if (!decoded.sub) {
-                throw new Error("El token no contiene el ID del usuario (sub)");
-            }
-
-            setDocenteActualId(decoded.sub);
-            setDocenteName(decoded.name);
-            console.log("Acceso autorizado para el usuario ID:", decoded.sub);
-
-        } catch (error) {
-            console.error("Bloqueo de seguridad: Token corrupto o invalido.", error);
-            // Expulsamos al usuario y limpiamos la basura
-            localStorage.removeItem("token");
-            delete api.defaults.headers.common["Authorization"];
-            router.push("/");
-        }
-    }, [router]);
-
-    // 2. EFECTO DE CARGA DE DATOS (Se ejecuta solo cuando ya tenemos el ID del docente)
+    // EFECTO DE CARGA DE DATOS: se ejecuta solo cuando useAuth ya confirmo la sesion
     useEffect(() => {
         if (docenteActualId !== null) {
             fetchStudents();
@@ -138,9 +98,9 @@ export default function Dashboard() {
         }
     }, [docenteActualId]);
 
+    // Calcula el resultado esperado del wizard de partida en vivo. No depende
+    // de la API, asi que no debe volver a pedir alumnos/grupos en cada tecleo.
     useEffect(() => {
-        fetchStudents();
-        fetchGroups();
         // Solo calculamos si todas las cifras requeridas están llenas
         const activeCifras = gameConfig.cifras.filter(c => c !== "");
 
@@ -171,11 +131,15 @@ export default function Dashboard() {
     }, [gameConfig.cifras, gameConfig.operation, gameConfig.numCifras]);
 
     const fetchStudents = async () => {
+        setIsLoadingStudents(true);
         try {
             const res = await api.get("/discentes");
             setStudents(res.data);
         } catch (error) {
             console.error("Error al cargar alumnos", error);
+            showToast("No se pudieron cargar los alumnos.", "error");
+        } finally {
+            setIsLoadingStudents(false);
         }
     };
 
@@ -188,6 +152,7 @@ export default function Dashboard() {
             }
         } catch (error) {
             console.error("Error al cargar grupos", error);
+            showToast("No se pudieron cargar los grupos.", "error");
         }
     };
 
@@ -230,10 +195,12 @@ export default function Dashboard() {
                 await api.post("/discentes", payload);
             }
             setIsStudentModalOpen(false);
+            showToast(editingStudent ? "Alumno actualizado correctamente." : "Alumno agregado correctamente.", "success");
             fetchStudents();
         } catch (error) {
             console.error("Error al guardar alumno", error);
-            alert("Error al guardar en la base de datos.");
+            const mensaje = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
+            showToast(Array.isArray(mensaje) ? mensaje[0] : mensaje || "Error al guardar el alumno.", "error");
         }
     };
 
@@ -247,10 +214,11 @@ export default function Dashboard() {
         try {
             await api.delete(`/discentes/${studentToDelete.id_discente}`);
             setStudentToDelete(null);
+            showToast("Alumno eliminado.", "success");
             fetchStudents();
         } catch (error) {
             console.error("Error al eliminar alumno", error);
-            alert("Hubo un error al eliminar el alumno. Revisa la consola del backend.");
+            showToast("Hubo un error al eliminar el alumno.", "error");
         } finally {
             setIsDeletingStudent(false);
         }
@@ -278,7 +246,7 @@ export default function Dashboard() {
     const handleGroupSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (docenteActualId === null) return alert("Error de sesión");
+        if (docenteActualId === null) return showToast("Error de sesión.", "error");
 
         const payload = {
             Nombre_Grupo: groupFormData.Nombre_Grupo,
@@ -294,10 +262,12 @@ export default function Dashboard() {
                 await api.post("/groups", payload);
             }
             setIsGroupModalOpen(false);
+            showToast(editingGroup ? "Grupo actualizado correctamente." : "Grupo creado correctamente.", "success");
             fetchGroups();
         } catch (error) {
             console.error("Error al guardar grupo", error);
-            alert("Error al guardar el grupo en la base de datos.");
+            const mensaje = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
+            showToast(Array.isArray(mensaje) ? mensaje[0] : mensaje || "Error al guardar el grupo.", "error");
         }
     };
 
@@ -313,26 +283,29 @@ export default function Dashboard() {
             await api.delete(`/groups/${groupToDelete.id_grupo}`);
             if (activeGroupId === groupToDelete.id_grupo) setActiveGroupId(null);
             setGroupToDelete(null);
+            showToast("Grupo eliminado.", "success");
             fetchGroups();
         } catch (error) {
             console.error("Error al eliminar grupo", error);
-            alert("Hubo un error al eliminar el grupo. Revisa la consola del backend.");
+            showToast("Hubo un error al eliminar el grupo.", "error");
         } finally {
             setIsDeletingGroup(false);
         }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem("token");
-        delete api.defaults.headers.common["Authorization"];
-        router.push("/");
-    };
-
     return (
         <div className="flex h-screen bg-gray-50 text-black overflow-hidden relative">
 
+            {/* Overlay para cerrar la barra lateral en movil */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/40 z-30 md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
             {/* ================= BARRA LATERAL (SIDEBAR) ================= */}
-            <aside className="w-72 bg-gray-900 text-white flex flex-col shadow-2xl z-10">
+            <aside className={`fixed md:relative inset-y-0 left-0 z-40 w-72 bg-gray-900 text-white flex flex-col shadow-2xl transform transition-transform duration-200 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
                 <div className="p-6 border-b border-gray-800 flex items-center gap-3">
                     <div className="p-2 bg-blue-600 rounded-lg">
                         <BookOpen size={24} className="text-white" />
@@ -408,7 +381,7 @@ export default function Dashboard() {
                     <div className="flex flex-col items-start">
                         <p className="font-semibold text-gray-200">{docenteName}</p>
                         <button
-                            onClick={handleLogout}
+                            onClick={logout}
                             className="text-xs text-gray-400 hover:text-red-400 transition-colors mt-0.5 flex items-center gap-1"
                         >
                             <LogOut size={12} /> Cerrar sesión
@@ -418,22 +391,31 @@ export default function Dashboard() {
             </aside>
 
             {/* ================= CONTENIDO PRINCIPAL ================= */}
-            <main className="flex-1 overflow-y-auto p-8 relative">
+            <main className="flex-1 overflow-y-auto p-4 sm:p-8 relative">
                 <div className="max-w-6xl mx-auto">
 
-                    <header className="flex justify-between items-end mb-8 border-b border-gray-200 pb-6">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-800">
-                                {activeGroupId && groups.find(g => g.id_grupo === activeGroupId)
-                                    ? `${groups.find(g => g.id_grupo === activeGroupId)?.Grado}° - ${groups.find(g => g.id_grupo === activeGroupId)?.Nombre_Grupo}`
-                                    : "Selecciona un grupo"}
-                            </h1>
-                            <p className="text-gray-500 mt-1">Gestión de alumnos inscritos</p>
+                    <header className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-8 border-b border-gray-200 pb-6">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-200 rounded-lg"
+                                aria-label="Abrir menú"
+                            >
+                                <Menu size={22} />
+                            </button>
+                            <div>
+                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+                                    {activeGroupId && groups.find(g => g.id_grupo === activeGroupId)
+                                        ? `${groups.find(g => g.id_grupo === activeGroupId)?.Grado}° - ${groups.find(g => g.id_grupo === activeGroupId)?.Nombre_Grupo}`
+                                        : "Selecciona un grupo"}
+                                </h1>
+                                <p className="text-gray-500 mt-1">Gestión de alumnos inscritos</p>
+                            </div>
                         </div>
                         {activeGroupId && (
                             <button
                                 onClick={handleOpenAddStudent}
-                                className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition shadow-lg font-medium"
+                                className="flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition shadow-lg font-medium shrink-0"
                             >
                                 <Plus size={20} /> Agregar Alumno
                             </button>
@@ -442,7 +424,8 @@ export default function Dashboard() {
 
                     {/* Tabla de Alumnos */}
                     {activeGroupId ? (
-                        <div className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
+                        <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                            <div className="overflow-x-auto">
                             <table className="min-w-full leading-normal">
                                 <thead>
                                 <tr className="bg-gray-50 text-gray-600 uppercase text-xs font-bold tracking-wider">
@@ -452,7 +435,9 @@ export default function Dashboard() {
                                 </thead>
                                 <tbody className="text-gray-700 text-sm">
                                 {/* CORRECCIÓN: Usamos filteredStudents en lugar de todos los students */}
-                                {filteredStudents.length === 0 ? (
+                                {isLoadingStudents ? (
+                                    <tr><td colSpan={2} className="text-center py-10 text-gray-400"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
+                                ) : filteredStudents.length === 0 ? (
                                     <tr><td colSpan={2} className="text-center py-8 text-gray-500 italic">No hay alumnos en este grupo</td></tr>
                                 ) : (
                                     filteredStudents.map((student) => (
@@ -483,6 +468,7 @@ export default function Dashboard() {
                                 )}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center h-64 text-gray-400">
@@ -629,7 +615,7 @@ export default function Dashboard() {
                             {playStep === 1 && (
                                 <div className="space-y-6 text-center">
                                     <h3 className="text-lg font-semibold text-gray-800">Selecciona el modo de juego</h3>
-                                    <div className="grid grid-cols-2 gap-4 mt-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                                         <button
                                             onClick={() => {
                                                 setIsPlayModalOpen(false);
@@ -660,7 +646,7 @@ export default function Dashboard() {
                                 <div className="space-y-6">
                                     <div>
                                         <h3 className="text-md font-bold text-gray-700 mb-3">1. ¿Qué tipo de actividad es?</h3>
-                                        <div className="flex gap-4">
+                                        <div className="flex flex-col sm:flex-row gap-4">
                                             <button
                                                 onClick={() => setGameConfig({...gameConfig, type: 'prueba'})}
                                                 className={`flex-1 py-3 rounded-lg border-2 font-bold transition-colors ${gameConfig.type === 'prueba' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:border-red-200'}`}
@@ -674,7 +660,7 @@ export default function Dashboard() {
 
                                     <div>
                                         <h3 className="text-md font-bold text-gray-700 mb-3">2. Selecciona el elemento</h3>
-                                        <div className="flex gap-4">
+                                        <div className="flex flex-col sm:flex-row gap-4">
                                             <button
                                                 onClick={() => setGameConfig({...gameConfig, element: 'tierra', operation: 'suma'})}
                                                 className={`flex-1 py-3 rounded-lg border-2 font-bold transition-colors ${gameConfig.element === 'tierra' ? 'border-orange-500 bg-orange-50 text-orange-800' : 'border-gray-200 text-gray-500 hover:border-orange-200'}`}
@@ -772,7 +758,7 @@ export default function Dashboard() {
                                                 </div>
                                             )}
 
-                                            <div className="grid grid-cols-5 gap-2">
+                                            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                                                 {gameConfig.cifras.map((cifra, idx) => (
                                                     <input
                                                         key={`cifra-${idx}`} type="number" required placeholder={`N° ${idx + 1}`}
@@ -823,7 +809,7 @@ export default function Dashboard() {
                                             </div>
 
                                             {gameConfig.numTrampas > 0 && (
-                                                <div className="grid grid-cols-5 gap-2">
+                                                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                                                     {gameConfig.trampas.map((trampa, idx) => (
                                                         <input
                                                             key={`trampa-${idx}`} type="number" required placeholder={`Trampa ${idx + 1}`}

@@ -2,12 +2,14 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import api from "@/config/api";
+import { useToast } from "@/components/ToastProvider";
 
-import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 export default function StatsPage() {
     const router = useRouter();
     const params = useParams();
+    const { showToast } = useToast();
 
     const [stats, setStats] = useState({
         avgTime: "0s",
@@ -64,6 +66,7 @@ export default function StatsPage() {
                 });
             } catch (error) {
                 console.error("Error al cargar estadisticas", error);
+                showToast("No se pudieron cargar las estadísticas del alumno.", "error");
             } finally {
                 setIsLoading(false);
             }
@@ -193,6 +196,11 @@ export default function StatsPage() {
                     </div>
 
                     <div className="overflow-x-auto">
+                        {isLoading ? (
+                            <div className="p-10 flex justify-center text-gray-400">
+                                <Loader2 size={24} className="animate-spin" />
+                            </div>
+                        ) : (
                         <table className="min-w-full text-left text-sm">
                             <thead className="bg-gray-100 text-gray-600 uppercase">
                             <tr>
@@ -220,8 +228,9 @@ export default function StatsPage() {
                             ))}
                             </tbody>
                         </table>
+                        )}
 
-                        {/* Mensaje de estado de carga o sin datos (Opcional) */}
+                        {/* Mensaje de sin datos */}
                         {!isLoading && stats.recentSessions.length === 0 && (
                             <div className="p-6 text-center text-gray-500">
                                 No hay sesiones registradas aún.

@@ -1,10 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
+import axios from "axios";
 import api from "@/config/api";
-import { Edit, Trash2, Plus, X, ShieldAlert, Users, LogOut } from "lucide-react";
+import { Edit, Trash2, Plus, X, ShieldAlert, Users, LogOut, Menu, Loader2 } from "lucide-react";
 import IconButton from "../components/IconButton";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
-import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/components/ToastProvider";
 
 interface Teacher {
     id_docente: number;
@@ -16,12 +18,15 @@ interface Teacher {
 }
 
 export default function AdminDashboard() {
-    const router = useRouter();
+    const { docenteId, logout } = useAuth();
+    const { showToast } = useToast();
 
     // --- ESTADOS ---
     const [teachers, setTeachers] = useState<Teacher[]>([]);
+    const [isLoadingTeachers, setIsLoadingTeachers] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     // Estados para el modal de confirmacion de borrado
     const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
@@ -37,30 +42,24 @@ export default function AdminDashboard() {
     });
 
     // --- EFECTOS ---
-    // Efecto de Autenticacion y Carga Inicial
+    // Una vez que useAuth confirma la sesion (docenteId listo), cargamos los docentes
     useEffect(() => {
-        const token = localStorage.getItem("token");
-
-        if (!token || token === "undefined" || token === "null") {
-            console.warn("Bloqueo: Redirigiendo al login...");
-            router.push("/");
-            return;
+        if (docenteId !== null) {
+            fetchTeachers();
         }
-
-        // Configura Axios para enviar el token en la peticion POST y GET
-        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
-        // Una vez configurado el token, ya podemos solicitar los docentes
-        fetchTeachers();
-    }, [router]);
+    }, [docenteId]);
 
     // --- MANEJADORES DE BASE DE DATOS (AXIOS) ---
     const fetchTeachers = async () => {
+        setIsLoadingTeachers(true);
         try {
             const response = await api.get("/teachers");
             setTeachers(response.data);
         } catch (error) {
             console.error("Error al cargar docentes desde la BD:", error);
+            showToast("No se pudieron cargar los docentes.", "error");
+        } finally {
+            setIsLoadingTeachers(false);
         }
     };
 
@@ -99,10 +98,12 @@ export default function AdminDashboard() {
                 await api.post("/teachers", formData);
             }
             setIsModalOpen(false);
+            showToast(editingTeacher ? "Docente actualizado correctamente." : "Docente creado correctamente.", "success");
             fetchTeachers(); // Recargar la tabla con los datos nuevos
         } catch (error) {
             console.error("Error al guardar docente:", error);
-            alert("Hubo un error al guardar. Revisa la consola del backend.");
+            const mensaje = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
+            showToast(Array.isArray(mensaje) ? mensaje[0] : mensaje || "Hubo un error al guardar el docente.", "error");
         }
     };
 
@@ -124,10 +125,11 @@ export default function AdminDashboard() {
             await api.delete(`/teachers/${teacherToDelete.id_docente}`);
             setTeacherToDelete(null);
             setDeleteImpact(null);
+            showToast("Docente eliminado.", "success");
             fetchTeachers(); // Recargar la tabla sin el docente eliminado
         } catch (error) {
             console.error("Error al eliminar docente:", error);
-            alert("Hubo un error al eliminar el docente. Revisa la consola del backend.");
+            showToast("Hubo un error al eliminar el docente.", "error");
         } finally {
             setIsDeleting(false);
         }
@@ -136,8 +138,16 @@ export default function AdminDashboard() {
     return (
         <div className="flex h-screen bg-gray-50 text-black overflow-hidden relative">
 
+            {/* Overlay para cerrar la barra lateral en movil */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/40 z-30 md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
             {/* ================= BARRA LATERAL ================= */}
-            <aside className="w-72 bg-slate-900 text-white flex flex-col shadow-2xl z-10">
+            <aside className={`fixed md:relative inset-y-0 left-0 z-40 w-72 bg-slate-900 text-white flex flex-col shadow-2xl transform transition-transform duration-200 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
                 <div className="p-6 border-b border-slate-800 flex items-center gap-3">
                     <div className="p-2 bg-red-600 rounded-lg shadow-lg shadow-red-500/30">
                         <ShieldAlert size={24} className="text-white" />
@@ -161,7 +171,7 @@ export default function AdminDashboard() {
                     <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-slate-300">A</div>
                     <div className="flex flex-col items-start">
                         <p className="font-semibold text-slate-200">Administrador</p>
-                        <button onClick={() => router.push('/')} className="text-xs text-slate-400 hover:text-red-400 transition-colors mt-0.5 flex items-center gap-1">
+                        <button onClick={logout} className="text-xs text-slate-400 hover:text-red-400 transition-colors mt-0.5 flex items-center gap-1">
                             <LogOut size={12} /> Cerrar sesión
                         </button>
                     </div>
@@ -169,23 +179,33 @@ export default function AdminDashboard() {
             </aside>
 
             {/* ================= CONTENIDO PRINCIPAL ================= */}
-            <main className="flex-1 overflow-y-auto p-8 relative">
+            <main className="flex-1 overflow-y-auto p-4 sm:p-8 relative">
                 <div className="max-w-6xl mx-auto">
 
-                    <header className="flex justify-between items-end mb-8 border-b border-gray-200 pb-6">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-800">Directorio de Docentes</h1>
-                            <p className="text-gray-500 mt-1">Administra los accesos de los profesores a la plataforma</p>
+                    <header className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-8 border-b border-gray-200 pb-6">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-200 rounded-lg"
+                                aria-label="Abrir menú"
+                            >
+                                <Menu size={22} />
+                            </button>
+                            <div>
+                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Directorio de Docentes</h1>
+                                <p className="text-gray-500 mt-1">Administra los accesos de los profesores a la plataforma</p>
+                            </div>
                         </div>
                         <button
                             onClick={handleOpenAdd}
-                            className="flex items-center gap-2 bg-slate-800 text-white px-5 py-2.5 rounded-lg hover:bg-slate-900 transition shadow-lg font-medium"
+                            className="flex items-center justify-center gap-2 bg-slate-800 text-white px-5 py-2.5 rounded-lg hover:bg-slate-900 transition shadow-lg font-medium shrink-0"
                         >
                             <Plus size={20} /> Registrar Docente
                         </button>
                     </header>
 
-                    <div className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
+                    <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                        <div className="overflow-x-auto">
                         <table className="min-w-full leading-normal">
                             <thead>
                             <tr className="bg-slate-50 text-slate-600 uppercase text-xs font-bold tracking-wider">
@@ -195,8 +215,10 @@ export default function AdminDashboard() {
                             </tr>
                             </thead>
                             <tbody className="text-gray-700 text-sm">
-                            {teachers.length === 0 ? (
-                                <tr><td colSpan={3} className="text-center py-8 text-gray-500 italic">Cargando datos o no hay docentes registrados</td></tr>
+                            {isLoadingTeachers ? (
+                                <tr><td colSpan={3} className="text-center py-10 text-gray-400"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
+                            ) : teachers.length === 0 ? (
+                                <tr><td colSpan={3} className="text-center py-8 text-gray-500 italic">No hay docentes registrados</td></tr>
                             ) : (
                                 teachers.map((teacher) => (
                                     <tr key={teacher.id_docente} className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
@@ -219,6 +241,7 @@ export default function AdminDashboard() {
                             )}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
             </main>
@@ -244,7 +267,7 @@ export default function AdminDashboard() {
                                     {/* CORRECCIÓN: value y onChange ahora apuntan a Nombre_Docente */}
                                     <input value={formData.Nombre_Docente} onChange={(e) => setFormData({...formData, Nombre_Docente: e.target.value})} className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none text-gray-900 bg-white" required />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Paterno</label>
                                         <input value={formData.Apellido_Paterno_Docente} onChange={(e) => setFormData({...formData, Apellido_Paterno_Docente: e.target.value})} className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none text-gray-900 bg-white" required />
@@ -255,7 +278,7 @@ export default function AdminDashboard() {
                                     </div>
                                 </div>
                                 <hr className="my-4 border-gray-100" />
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-1">Usuario</label>
                                         <input value={formData.Usuario} onChange={(e) => setFormData({...formData, Usuario: e.target.value})} className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900 bg-slate-50 font-mono text-sm" placeholder="ej. perez.juan" required />
@@ -264,7 +287,7 @@ export default function AdminDashboard() {
                                         <label className="block text-sm font-semibold text-gray-700 mb-1">
                                             Contraseña {editingTeacher && <span className="text-xs text-gray-400 font-normal">(Vacío = no cambiar)</span>}
                                         </label>
-                                        <input type="password" value={formData.Password} onChange={(e) => setFormData({...formData, Password: e.target.value})} className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900 bg-white" placeholder="******" required={!editingTeacher} />
+                                        <input type="password" value={formData.Password} onChange={(e) => setFormData({...formData, Password: e.target.value})} className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900 bg-white" placeholder="******" required={!editingTeacher} minLength={4} />
                                     </div>
                                 </div>
                             </div>

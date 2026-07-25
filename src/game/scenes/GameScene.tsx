@@ -6,6 +6,8 @@ import {
     TouchControls
 } from './patterns';
 import {audioManager} from "@/game/scenes/audioManager";
+import { generateProblema } from './exerciseGenerator';
+import type { DificultadNum, ProblemaMatematico } from './LevelsData';
 
 export class GameScene extends Phaser.Scene {
     private player!: Phaser.Physics.Arcade.Sprite;
@@ -19,6 +21,10 @@ export class GameScene extends Phaser.Scene {
     private bgMusic!: Phaser.Sound.BaseSound;
     private currentDifficulty: number = 2;
     private totalStarsHistorical: number = 0;
+    // Problema procedural generado para este intento (Modo Historia). Se
+    // reutiliza en los reintentos con vidas restantes para no cambiar el
+    // ejercicio a media partida; se regenera en un intento nuevo/nivel nuevo.
+    private currentProblema: ProblemaMatematico | null = null;
 
     private levelData: any = null;
     private currentElement: 'tierra' | 'agua' = 'tierra';
@@ -70,17 +76,18 @@ export class GameScene extends Phaser.Scene {
 
             } else {
                 this.currentDifficulty = data.dificultad || 2;
+                const dificultadGenerador = Phaser.Math.Clamp(this.currentDifficulty, 1, 3) as DificultadNum;
+                const esPrueba = this.levelData.type === 'prueba';
 
-                const problemasDelNivel = this.levelData.problemas || {};
-                const problemaActual = problemasDelNivel[this.currentDifficulty as keyof typeof problemasDelNivel];
+                // Si venimos de un reintento con vidas restantes (mismo nivel),
+                // reutilizamos el problema ya generado en vez de crear uno nuevo.
+                const problemaActual: ProblemaMatematico = data.problema
+                    ?? generateProblema(this.levelData.operation, dificultadGenerador, esPrueba);
 
-                if (problemaActual) {
-                    this.levelConfig.targetNumbers = problemaActual.cifras.map(Number);
-                    this.levelConfig.trapNumbers = problemaActual.trampas.map(Number);
-                    this.levelConfig.solution = Number(problemaActual.resultado);
-                } else {
-                    console.warn("No se encontraron problemas para la dificultad:", this.currentDifficulty);
-                }
+                this.currentProblema = problemaActual;
+                this.levelConfig.targetNumbers = problemaActual.cifras;
+                this.levelConfig.trapNumbers = problemaActual.trampas;
+                this.levelConfig.solution = problemaActual.resultado;
             }
 
             this.levelConfig.platformCount = this.levelConfig.targetNumbers.length + this.levelConfig.trapNumbers.length + 2;
@@ -136,23 +143,7 @@ export class GameScene extends Phaser.Scene {
         this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.touchControls = new TouchControls(this, gameWidth, playableHeight);
 
-        let equationString = "? x ? = ?";
-
-        if (this.levelData) {
-            let symbol = '+';
-            switch(this.levelData.operation) {
-                case 'suma': symbol = '+'; break;
-                case 'resta': symbol = '-'; break;
-                case 'multiplicacion': symbol = 'x'; break;
-                case 'division': symbol = '÷'; break;
-            }
-
-            const numCifras = this.levelData.numCifras || this.levelConfig.targetNumbers.length;
-            const questionMarks = Array(numCifras).fill('?').join(` ${symbol} `);
-            equationString = `${questionMarks} = ${this.levelConfig.solution}`;
-        }
-
-        this.ui.setEquationText(equationString);
+        this.ui.setEquationText(this.buildEquationString());
 
         if (this.textures.exists('axolotl_idle') && this.textures.exists('axolotl_walking')) {
             if (!this.anims.exists('idle')) {
@@ -275,7 +266,28 @@ export class GameScene extends Phaser.Scene {
                 this.emotionState.transitionTo(new HappyState());
             }
             numItem.destroy();
+            this.ui.setEquationText(this.buildEquationString());
         }
+    }
+
+    private buildEquationString(): string {
+        let symbol = '+';
+        if (this.levelData) {
+            switch (this.levelData.operation) {
+                case 'suma': symbol = '+'; break;
+                case 'resta': symbol = '-'; break;
+                case 'multiplicacion': symbol = 'x'; break;
+                case 'division': symbol = '÷'; break;
+            }
+        }
+
+        const numCifras = (this.levelData && this.levelData.numCifras) || this.levelConfig.targetNumbers.length;
+        const collected = this.gameState.collectedNumbers;
+        const slots = Array.from({ length: numCifras }, (_, i) =>
+            i < collected.length ? String(collected[i]) : '?'
+        );
+
+        return `${slots.join(` ${symbol} `)} = ${this.levelConfig.solution}`;
     }
     private handleDoorCollision(player: Phaser.GameObjects.GameObject, door: Phaser.GameObjects.GameObject) {
         if (this.gameState.isGameOver) return;
@@ -311,7 +323,7 @@ export class GameScene extends Phaser.Scene {
                 btn.on('pointerover', () => btn.setTexture('btn_volver_a_jugar_1'));
                 btn.on('pointerout', () => btn.setTexture('btn_volver_a_jugar_0'));
                 btn.on('pointerdown', () => {
-                    this.scene.restart({ config: this.levelData, lives: this.gameState.lives, dificultad: this.currentDifficulty,totalStars: this.totalStarsHistorical });
+                    this.scene.restart({ config: this.levelData, lives: this.gameState.lives, dificultad: this.currentDifficulty, totalStars: this.totalStarsHistorical, problema: this.currentProblema });
                 });
             } else {
                 this.triggerLoss('TE QUEDASTE SIN VIDAS');
