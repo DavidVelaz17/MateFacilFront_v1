@@ -40,6 +40,9 @@ export class PreloadScene extends Phaser.Scene{
         //FONDOS
         this.load.image('bg_agua', '/assets/bg_agua.png');
         this.load.image('bg_tierra', '/assets/bg_tierra.jpg');
+        //FONDOS CON TUTORIAL PARA PC
+        this.load.image('bg_tierra_tutorial', '/assets/bg_tierra_tutorial.jpeg');
+        this.load.image('bg_agua_tutorial', '/assets/bg_agua_tutorial.jpeg');
 
         //ELEMENTOS DEL MAPA
         this.load.image('platform_tierra', '/assets/platform_tierra.png');

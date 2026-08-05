@@ -1,14 +1,16 @@
 "use client";
 import { useState, useEffect } from "react";
-import { jwtDecode } from "jwt-decode";
+import axios from "axios";
 import {
     Edit, Trash2, Play, BarChart2, Plus, X,
-    Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut
+    Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut, Menu, Loader2, Search, Star
 } from "lucide-react";
 import IconButton from "../components/IconButton";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { useRouter } from "next/navigation";
 import api from "@/config/api";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/components/ToastProvider";
 
 // --- INTERFACES ---
 interface Group {
@@ -24,6 +26,8 @@ interface Student {
     Apellido_Paterno_Discente: string;
     Apellido_Materno_Discente: string;
     grupos?: Group[];
+    Activo?: boolean;
+    totalStars?: number;
 }
 
 interface GameConfig {
@@ -39,19 +43,23 @@ interface GameConfig {
     trampas: string[];
 }
 
-interface CustomJwtPayload {
-    sub: number;
-    username: string;
-    name: string;
-    role: string;
+// Quita acentos/diacríticos para que la búsqueda encuentre "Sofía" al
+// escribir "sofia", sin importar mayúsculas.
+function normalizeSearchText(value: string): string {
+    return value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
 }
 
 export default function Dashboard() {
     const router = useRouter();
-    const [docenteActualId, setDocenteActualId] = useState<number | null>(null);
-    const [docenteName, setDocenteName] = useState<string>("Cargando...");
+    const { docenteId: docenteActualId, docenteName, logout } = useAuth();
+    const { showToast } = useToast();
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     // --- ESTADOS DE ALUMNOS ---
     const [students, setStudents] = useState<Student[]>([]);
+    const [isLoadingStudents, setIsLoadingStudents] = useState(true);
     const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
     const [isPlayModalOpen, setIsPlayModalOpen] = useState(false);
@@ -75,6 +83,10 @@ export default function Dashboard() {
         Apellido_Paterno_Discente: "",
         Apellido_Materno_Discente: ""
     });
+    // Pestaña del modal de alumno: crear uno nuevo o buscar uno ya existente
+    const [studentModalTab, setStudentModalTab] = useState<'nuevo' | 'existente'>('nuevo');
+    const [studentSearchQuery, setStudentSearchQuery] = useState("");
+    const [isAddingExistingStudent, setIsAddingExistingStudent] = useState(false);
 
     // Estados para el modal de confirmacion de borrado de alumno
     const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
@@ -93,44 +105,7 @@ export default function Dashboard() {
     const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
     const [isDeletingGroup, setIsDeletingGroup] = useState(false);
 
-    //  AUTENTICACION
-    useEffect(() => {
-        const token = localStorage.getItem("token");
-
-        // Proteccion contra nulos o strings "undefined" accidentales
-        if (!token || token === "undefined" || token === "null") {
-            console.warn("Bloqueo de seguridad: No hay un token valido. Redirigiendo al login...");
-            localStorage.removeItem("token");
-            router.push("/");
-            return;
-        }
-
-        // Configura Axios para que todas las peticiones lleven el token
-        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
-        try {
-            // Decodifica el token para obtener el ID del docente
-            const decoded = jwtDecode<CustomJwtPayload>(token);
-
-            // Verificamos que el payload tenga el ID (sub)
-            if (!decoded.sub) {
-                throw new Error("El token no contiene el ID del usuario (sub)");
-            }
-
-            setDocenteActualId(decoded.sub);
-            setDocenteName(decoded.name);
-            console.log("Acceso autorizado para el usuario ID:", decoded.sub);
-
-        } catch (error) {
-            console.error("Bloqueo de seguridad: Token corrupto o invalido.", error);
-            // Expulsamos al usuario y limpiamos la basura
-            localStorage.removeItem("token");
-            delete api.defaults.headers.common["Authorization"];
-            router.push("/");
-        }
-    }, [router]);
-
-    // 2. EFECTO DE CARGA DE DATOS (Se ejecuta solo cuando ya tenemos el ID del docente)
+    // EFECTO DE CARGA DE DATOS: se ejecuta solo cuando useAuth ya confirmo la sesion
     useEffect(() => {
         if (docenteActualId !== null) {
             fetchStudents();
@@ -138,9 +113,9 @@ export default function Dashboard() {
         }
     }, [docenteActualId]);
 
+    // Calcula el resultado esperado del wizard de partida en vivo. No depende
+    // de la API, asi que no debe volver a pedir alumnos/grupos en cada tecleo.
     useEffect(() => {
-        fetchStudents();
-        fetchGroups();
         // Solo calculamos si todas las cifras requeridas están llenas
         const activeCifras = gameConfig.cifras.filter(c => c !== "");
 
@@ -171,11 +146,15 @@ export default function Dashboard() {
     }, [gameConfig.cifras, gameConfig.operation, gameConfig.numCifras]);
 
     const fetchStudents = async () => {
+        setIsLoadingStudents(true);
         try {
             const res = await api.get("/discentes");
             setStudents(res.data);
         } catch (error) {
             console.error("Error al cargar alumnos", error);
+            showToast("No se pudieron cargar los alumnos.", "error");
+        } finally {
+            setIsLoadingStudents(false);
         }
     };
 
@@ -188,18 +167,38 @@ export default function Dashboard() {
             }
         } catch (error) {
             console.error("Error al cargar grupos", error);
+            showToast("No se pudieron cargar los grupos.", "error");
         }
     };
 
+    // Los alumnos dados de baja por el administrador no se gestionan desde aqui
+    const activeStudents = students.filter(student => student.Activo !== false);
+
     // Solo nos quedamos con los alumnos que tengan el ID del grupo activo
-    const filteredStudents = students.filter(student =>
+    const filteredStudents = activeStudents.filter(student =>
         student.grupos?.some(g => g.id_grupo === activeGroupId)
     );
+
+    // Alumnos que aun no pertenecen al grupo activo, candidatos para la busqueda
+    const studentsAvailableToAdd = activeStudents.filter(student =>
+        !student.grupos?.some(g => g.id_grupo === activeGroupId)
+    );
+
+    const studentSearchResults = studentSearchQuery.trim() === ""
+        ? studentsAvailableToAdd
+        : studentsAvailableToAdd.filter(student => {
+            const fullName = normalizeSearchText(
+                `${student.Nombre_Discente} ${student.Apellido_Paterno_Discente} ${student.Apellido_Materno_Discente}`
+            );
+            return fullName.includes(normalizeSearchText(studentSearchQuery.trim()));
+        });
 
     // --- MANEJADORES DE ALUMNOS (CRUD) ---
     const handleOpenAddStudent = () => {
         setEditingStudent(null);
         setStudentFormData({ Nombre_Discente: "", Apellido_Paterno_Discente: "", Apellido_Materno_Discente: "" });
+        setStudentModalTab('nuevo');
+        setStudentSearchQuery('');
         setIsStudentModalOpen(true);
     };
 
@@ -230,10 +229,36 @@ export default function Dashboard() {
                 await api.post("/discentes", payload);
             }
             setIsStudentModalOpen(false);
+            showToast(editingStudent ? "Alumno actualizado correctamente." : "Alumno agregado correctamente.", "success");
             fetchStudents();
         } catch (error) {
             console.error("Error al guardar alumno", error);
-            alert("Error al guardar en la base de datos.");
+            const mensaje = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
+            showToast(Array.isArray(mensaje) ? mensaje[0] : mensaje || "Error al guardar el alumno.", "error");
+        }
+    };
+
+    const handleAddExistingStudent = async (student: Student) => {
+        if (!activeGroupId) return;
+        setIsAddingExistingStudent(true);
+        try {
+            const currentGroupIds = (student.grupos || []).map(g => g.id_grupo);
+            const nextGroupIds = currentGroupIds.includes(activeGroupId)
+                ? currentGroupIds
+                : [...currentGroupIds, activeGroupId];
+
+            await api.patch(`/discentes/${student.id_discente}`, {
+                grupos: nextGroupIds.map(id_grupo => ({ id_grupo }))
+            });
+            setIsStudentModalOpen(false);
+            showToast("Alumno agregado al grupo.", "success");
+            fetchStudents();
+        } catch (error) {
+            console.error("Error al agregar alumno existente", error);
+            const mensaje = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
+            showToast(Array.isArray(mensaje) ? mensaje[0] : mensaje || "Error al agregar el alumno.", "error");
+        } finally {
+            setIsAddingExistingStudent(false);
         }
     };
 
@@ -247,10 +272,11 @@ export default function Dashboard() {
         try {
             await api.delete(`/discentes/${studentToDelete.id_discente}`);
             setStudentToDelete(null);
+            showToast("Alumno eliminado.", "success");
             fetchStudents();
         } catch (error) {
             console.error("Error al eliminar alumno", error);
-            alert("Hubo un error al eliminar el alumno. Revisa la consola del backend.");
+            showToast("Hubo un error al eliminar el alumno.", "error");
         } finally {
             setIsDeletingStudent(false);
         }
@@ -278,7 +304,7 @@ export default function Dashboard() {
     const handleGroupSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (docenteActualId === null) return alert("Error de sesión");
+        if (docenteActualId === null) return showToast("Error de sesión.", "error");
 
         const payload = {
             Nombre_Grupo: groupFormData.Nombre_Grupo,
@@ -294,10 +320,12 @@ export default function Dashboard() {
                 await api.post("/groups", payload);
             }
             setIsGroupModalOpen(false);
+            showToast(editingGroup ? "Grupo actualizado correctamente." : "Grupo creado correctamente.", "success");
             fetchGroups();
         } catch (error) {
             console.error("Error al guardar grupo", error);
-            alert("Error al guardar el grupo en la base de datos.");
+            const mensaje = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
+            showToast(Array.isArray(mensaje) ? mensaje[0] : mensaje || "Error al guardar el grupo.", "error");
         }
     };
 
@@ -313,26 +341,29 @@ export default function Dashboard() {
             await api.delete(`/groups/${groupToDelete.id_grupo}`);
             if (activeGroupId === groupToDelete.id_grupo) setActiveGroupId(null);
             setGroupToDelete(null);
+            showToast("Grupo eliminado.", "success");
             fetchGroups();
         } catch (error) {
             console.error("Error al eliminar grupo", error);
-            alert("Hubo un error al eliminar el grupo. Revisa la consola del backend.");
+            showToast("Hubo un error al eliminar el grupo.", "error");
         } finally {
             setIsDeletingGroup(false);
         }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem("token");
-        delete api.defaults.headers.common["Authorization"];
-        router.push("/");
-    };
-
     return (
         <div className="flex h-screen bg-gray-50 text-black overflow-hidden relative">
 
+            {/* Overlay para cerrar la barra lateral en movil */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/40 z-30 md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
             {/* ================= BARRA LATERAL (SIDEBAR) ================= */}
-            <aside className="w-72 bg-gray-900 text-white flex flex-col shadow-2xl z-10">
+            <aside className={`fixed md:relative inset-y-0 left-0 z-40 w-72 bg-gray-900 text-white flex flex-col shadow-2xl transform transition-transform duration-200 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
                 <div className="p-6 border-b border-gray-800 flex items-center gap-3">
                     <div className="p-2 bg-blue-600 rounded-lg">
                         <BookOpen size={24} className="text-white" />
@@ -374,7 +405,7 @@ export default function Dashboard() {
                                         }`}
                                     >
                                         <span className="truncate pr-2">
-                                            <strong className="font-medium text-gray-200">{group.Grado}°</strong> - {group.Nombre_Grupo}
+                                            <strong className="font-medium text-gray-200">{group.Grado}°</strong> - {group.Nombre_Grupo} <span className="text-gray-500">({group.Año})</span>
                                         </span>
 
                                         <div className="hidden group-hover:flex items-center gap-1">
@@ -403,12 +434,12 @@ export default function Dashboard() {
 
                 <div className="p-4 border-t border-gray-800 text-sm flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center font-bold text-gray-300">
-                        P
+                        {docenteName?.trim().charAt(0).toUpperCase() || "P"}
                     </div>
                     <div className="flex flex-col items-start">
                         <p className="font-semibold text-gray-200">{docenteName}</p>
                         <button
-                            onClick={handleLogout}
+                            onClick={logout}
                             className="text-xs text-gray-400 hover:text-red-400 transition-colors mt-0.5 flex items-center gap-1"
                         >
                             <LogOut size={12} /> Cerrar sesión
@@ -418,22 +449,31 @@ export default function Dashboard() {
             </aside>
 
             {/* ================= CONTENIDO PRINCIPAL ================= */}
-            <main className="flex-1 overflow-y-auto p-8 relative">
+            <main className="flex-1 overflow-y-auto p-4 sm:p-8 relative">
                 <div className="max-w-6xl mx-auto">
 
-                    <header className="flex justify-between items-end mb-8 border-b border-gray-200 pb-6">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-800">
-                                {activeGroupId && groups.find(g => g.id_grupo === activeGroupId)
-                                    ? `${groups.find(g => g.id_grupo === activeGroupId)?.Grado}° - ${groups.find(g => g.id_grupo === activeGroupId)?.Nombre_Grupo}`
-                                    : "Selecciona un grupo"}
-                            </h1>
-                            <p className="text-gray-500 mt-1">Gestión de alumnos inscritos</p>
+                    <header className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-8 border-b border-gray-200 pb-6">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-200 rounded-lg"
+                                aria-label="Abrir menú"
+                            >
+                                <Menu size={22} />
+                            </button>
+                            <div>
+                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+                                    {activeGroupId && groups.find(g => g.id_grupo === activeGroupId)
+                                        ? `${groups.find(g => g.id_grupo === activeGroupId)?.Grado}° - ${groups.find(g => g.id_grupo === activeGroupId)?.Nombre_Grupo} (${groups.find(g => g.id_grupo === activeGroupId)?.Año})`
+                                        : "Selecciona un grupo"}
+                                </h1>
+                                <p className="text-gray-500 mt-1">Gestión de alumnos inscritos</p>
+                            </div>
                         </div>
                         {activeGroupId && (
                             <button
                                 onClick={handleOpenAddStudent}
-                                className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition shadow-lg font-medium"
+                                className="flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition shadow-lg font-medium shrink-0"
                             >
                                 <Plus size={20} /> Agregar Alumno
                             </button>
@@ -442,23 +482,33 @@ export default function Dashboard() {
 
                     {/* Tabla de Alumnos */}
                     {activeGroupId ? (
-                        <div className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
+                        <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                            <div className="overflow-x-auto">
                             <table className="min-w-full leading-normal">
                                 <thead>
                                 <tr className="bg-gray-50 text-gray-600 uppercase text-xs font-bold tracking-wider">
                                     <th className="py-4 px-6 text-left border-b border-gray-200">Nombre Completo</th>
+                                    <th className="py-4 px-6 text-center border-b border-gray-200">Estrellas</th>
                                     <th className="py-4 px-6 text-center border-b border-gray-200">Acciones</th>
                                 </tr>
                                 </thead>
                                 <tbody className="text-gray-700 text-sm">
                                 {/* CORRECCIÓN: Usamos filteredStudents en lugar de todos los students */}
-                                {filteredStudents.length === 0 ? (
-                                    <tr><td colSpan={2} className="text-center py-8 text-gray-500 italic">No hay alumnos en este grupo</td></tr>
+                                {isLoadingStudents ? (
+                                    <tr><td colSpan={3} className="text-center py-10 text-gray-400"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
+                                ) : filteredStudents.length === 0 ? (
+                                    <tr><td colSpan={3} className="text-center py-8 text-gray-500 italic">No hay alumnos en este grupo</td></tr>
                                 ) : (
                                     filteredStudents.map((student) => (
                                         <tr key={student.id_discente} className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors">
                                             <td className="py-4 px-6 text-left font-medium">
                                                 {student.Apellido_Paterno_Discente} {student.Apellido_Materno_Discente} {student.Nombre_Discente}
+                                            </td>
+                                            <td className="py-4 px-6 text-center">
+                                                <span className="inline-flex items-center gap-1 font-semibold text-amber-600">
+                                                    <Star size={16} className="fill-amber-400 text-amber-500" />
+                                                    {student.totalStars ?? 0}
+                                                </span>
                                             </td>
                                             <td className="py-4 px-6 text-center">
                                                 <div className="flex item-center justify-center gap-3">
@@ -483,6 +533,7 @@ export default function Dashboard() {
                                 )}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center h-64 text-gray-400">
@@ -499,47 +550,118 @@ export default function Dashboard() {
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative overflow-hidden ring-1 ring-gray-200">
                         <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                             <h2 className="text-xl font-bold text-gray-800">
-                                {editingStudent ? "Editar Alumno" : "Nuevo Alumno"}
+                                {editingStudent ? "Editar Alumno" : "Agregar Alumno"}
                             </h2>
                             <button onClick={() => setIsStudentModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-200">
                                 <X size={20} />
                             </button>
                         </div>
-                        <form onSubmit={handleStudentSubmit} className="p-6">
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre(s)</label>
+
+                        {!editingStudent && (
+                            <div className="flex gap-2 px-6 pt-3 border-b border-gray-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setStudentModalTab('nuevo')}
+                                    className={`px-4 py-2 text-sm font-semibold transition border-b-2 ${
+                                        studentModalTab === 'nuevo'
+                                            ? 'text-blue-600 border-blue-600'
+                                            : 'text-gray-500 border-transparent hover:text-gray-700'
+                                    }`}
+                                >
+                                    Nuevo alumno
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setStudentModalTab('existente')}
+                                    className={`px-4 py-2 text-sm font-semibold transition border-b-2 ${
+                                        studentModalTab === 'existente'
+                                            ? 'text-blue-600 border-blue-600'
+                                            : 'text-gray-500 border-transparent hover:text-gray-700'
+                                    }`}
+                                >
+                                    Alumno existente
+                                </button>
+                            </div>
+                        )}
+
+                        {!editingStudent && studentModalTab === 'existente' ? (
+                            <div className="p-6">
+                                <div className="relative mb-4">
+                                    <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                     <input
-                                        value={studentFormData.Nombre_Discente}
-                                        onChange={(e) => setStudentFormData({...studentFormData, Nombre_Discente: e.target.value})}
-                                        className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
-                                        required
+                                        type="text"
+                                        autoFocus
+                                        value={studentSearchQuery}
+                                        onChange={(e) => setStudentSearchQuery(e.target.value)}
+                                        placeholder="Buscar por nombre o apellido..."
+                                        className="w-full border border-gray-300 pl-10 pr-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Paterno</label>
-                                    <input
-                                        value={studentFormData.Apellido_Paterno_Discente}
-                                        onChange={(e) => setStudentFormData({...studentFormData, Apellido_Paterno_Discente: e.target.value})}
-                                        className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
-                                        required
-                                    />
+                                <div className="max-h-72 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-100">
+                                    {studentSearchResults.length === 0 ? (
+                                        <p className="text-center text-sm text-gray-500 italic py-6 px-4">
+                                            {studentSearchQuery.trim() === ""
+                                                ? "No hay más alumnos disponibles para agregar."
+                                                : "No se encontraron alumnos con ese nombre."}
+                                        </p>
+                                    ) : (
+                                        studentSearchResults.map((student) => (
+                                            <button
+                                                type="button"
+                                                key={student.id_discente}
+                                                onClick={() => handleAddExistingStudent(student)}
+                                                disabled={isAddingExistingStudent}
+                                                className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors flex items-center justify-between gap-3 disabled:opacity-50"
+                                            >
+                                                <span className="text-gray-800 font-medium">
+                                                    {student.Apellido_Paterno_Discente} {student.Apellido_Materno_Discente} {student.Nombre_Discente}
+                                                </span>
+                                                <Plus size={16} className="text-blue-600 shrink-0" />
+                                            </button>
+                                        ))
+                                    )}
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Materno</label>
-                                    <input
-                                        value={studentFormData.Apellido_Materno_Discente}
-                                        onChange={(e) => setStudentFormData({...studentFormData, Apellido_Materno_Discente: e.target.value})}
-                                        className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
-                                        required
-                                    />
+                                <div className="flex justify-end mt-6 pt-4 border-t border-gray-100">
+                                    <button type="button" onClick={() => setIsStudentModalOpen(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition font-medium">Cancelar</button>
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
-                                <button type="button" onClick={() => setIsStudentModalOpen(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition font-medium">Cancelar</button>
-                                <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">{editingStudent ? "Guardar" : "Agregar"}</button>
-                            </div>
-                        </form>
+                        ) : (
+                            <form onSubmit={handleStudentSubmit} className="p-6">
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre(s)</label>
+                                        <input
+                                            value={studentFormData.Nombre_Discente}
+                                            onChange={(e) => setStudentFormData({...studentFormData, Nombre_Discente: e.target.value})}
+                                            className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Paterno</label>
+                                        <input
+                                            value={studentFormData.Apellido_Paterno_Discente}
+                                            onChange={(e) => setStudentFormData({...studentFormData, Apellido_Paterno_Discente: e.target.value})}
+                                            className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Materno</label>
+                                        <input
+                                            value={studentFormData.Apellido_Materno_Discente}
+                                            onChange={(e) => setStudentFormData({...studentFormData, Apellido_Materno_Discente: e.target.value})}
+                                            className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
+                                    <button type="button" onClick={() => setIsStudentModalOpen(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition font-medium">Cancelar</button>
+                                    <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">{editingStudent ? "Guardar" : "Agregar"}</button>
+                                </div>
+                            </form>
+                        )}
                     </div>
                 </div>
             )}
@@ -629,7 +751,7 @@ export default function Dashboard() {
                             {playStep === 1 && (
                                 <div className="space-y-6 text-center">
                                     <h3 className="text-lg font-semibold text-gray-800">Selecciona el modo de juego</h3>
-                                    <div className="grid grid-cols-2 gap-4 mt-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                                         <button
                                             onClick={() => {
                                                 setIsPlayModalOpen(false);
@@ -660,7 +782,7 @@ export default function Dashboard() {
                                 <div className="space-y-6">
                                     <div>
                                         <h3 className="text-md font-bold text-gray-700 mb-3">1. ¿Qué tipo de actividad es?</h3>
-                                        <div className="flex gap-4">
+                                        <div className="flex flex-col sm:flex-row gap-4">
                                             <button
                                                 onClick={() => setGameConfig({...gameConfig, type: 'prueba'})}
                                                 className={`flex-1 py-3 rounded-lg border-2 font-bold transition-colors ${gameConfig.type === 'prueba' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:border-red-200'}`}
@@ -674,15 +796,23 @@ export default function Dashboard() {
 
                                     <div>
                                         <h3 className="text-md font-bold text-gray-700 mb-3">2. Selecciona el elemento</h3>
-                                        <div className="flex gap-4">
+                                        <div className="flex flex-col sm:flex-row gap-4">
                                             <button
                                                 onClick={() => setGameConfig({...gameConfig, element: 'tierra', operation: 'suma'})}
-                                                className={`flex-1 py-3 rounded-lg border-2 font-bold transition-colors ${gameConfig.element === 'tierra' ? 'border-orange-500 bg-orange-50 text-orange-800' : 'border-gray-200 text-gray-500 hover:border-orange-200'}`}
-                                            >Tierra (+, -)</button>
+                                                style={{ backgroundImage: "url('/assets/bg_tierra.jpg')" }}
+                                                className={`relative flex-1 py-8 rounded-lg border-2 font-bold bg-cover bg-center overflow-hidden transition-all ${gameConfig.element === 'tierra' ? 'border-orange-500 ring-2 ring-orange-400' : 'border-gray-200 hover:border-orange-300'}`}
+                                            >
+                                                <span className={`absolute inset-0 transition-colors ${gameConfig.element === 'tierra' ? 'bg-orange-900/30' : 'bg-black/40 hover:bg-black/25'}`} />
+                                                <span className="relative z-10 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">Tierra (+, -)</span>
+                                            </button>
                                             <button
                                                 onClick={() => setGameConfig({...gameConfig, element: 'agua', operation: 'multiplicacion', numCifras: 2, cifras: ['', '']})}
-                                                className={`flex-1 py-3 rounded-lg border-2 font-bold transition-colors ${gameConfig.element === 'agua' ? 'border-cyan-500 bg-cyan-50 text-cyan-800' : 'border-gray-200 text-gray-500 hover:border-cyan-200'}`}
-                                            >Agua (x, ÷)</button>
+                                                style={{ backgroundImage: "url('/assets/bg_agua.png')" }}
+                                                className={`relative flex-1 py-8 rounded-lg border-2 font-bold bg-cover bg-center overflow-hidden transition-all ${gameConfig.element === 'agua' ? 'border-cyan-500 ring-2 ring-cyan-400' : 'border-gray-200 hover:border-cyan-300'}`}
+                                            >
+                                                <span className={`absolute inset-0 transition-colors ${gameConfig.element === 'agua' ? 'bg-cyan-900/30' : 'bg-black/40 hover:bg-black/25'}`} />
+                                                <span className="relative z-10 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">Agua (x, ÷)</span>
+                                            </button>
                                         </div>
                                     </div>
 
@@ -772,7 +902,7 @@ export default function Dashboard() {
                                                 </div>
                                             )}
 
-                                            <div className="grid grid-cols-5 gap-2">
+                                            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                                                 {gameConfig.cifras.map((cifra, idx) => (
                                                     <input
                                                         key={`cifra-${idx}`} type="number" required placeholder={`N° ${idx + 1}`}
@@ -823,7 +953,7 @@ export default function Dashboard() {
                                             </div>
 
                                             {gameConfig.numTrampas > 0 && (
-                                                <div className="grid grid-cols-5 gap-2">
+                                                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                                                     {gameConfig.trampas.map((trampa, idx) => (
                                                         <input
                                                             key={`trampa-${idx}`} type="number" required placeholder={`Trampa ${idx + 1}`}
@@ -885,7 +1015,7 @@ export default function Dashboard() {
                         <>
                             ¿Estás seguro de que deseas eliminar el grupo{" "}
                             <span className="font-semibold">
-                                {groupToDelete.Grado}° - {groupToDelete.Nombre_Grupo}
+                                {groupToDelete.Grado}° - {groupToDelete.Nombre_Grupo} ({groupToDelete.Año})
                             </span>
                             ? Se perderá el acceso a sus alumnos. Esta acción no se puede deshacer.
                         </>

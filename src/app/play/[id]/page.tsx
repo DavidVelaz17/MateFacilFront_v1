@@ -4,6 +4,7 @@ import {useParams, useSearchParams} from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {EventBus} from "@/game/scenes/patterns";
 import api from "@/config/api";
+import { useToast } from "@/components/ToastProvider";
 
 const PhaserGame = dynamic(() => import('@/components/PhaserGame'), {
     ssr: false,
@@ -13,6 +14,7 @@ const PhaserGame = dynamic(() => import('@/components/PhaserGame'), {
 export default function PlayPage() {
     const searchParams = useSearchParams();
     const params = useParams();
+    const { showToast } = useToast();
     const [levelData, setLevelData] = useState<any>(null);
 
     // 1. EFECTO ORIGINAL: Carga la configuración del nivel
@@ -41,6 +43,7 @@ export default function PlayPage() {
                 }
             } catch (error) {
                 console.error("No se pudo cargar el historial de estrellas:", error);
+                showToast("No se pudo cargar el historial de estrellas del alumno.", "info");
             }
             setLevelData(initialPhaserData);
         };
@@ -77,6 +80,7 @@ export default function PlayPage() {
                 console.log("¡Estadísticas guardadas exitosamente en la base de datos!");
             } catch (error) {
                 console.error("Fallo al guardar las estadísticas en el backend:", error);
+                showToast("No se pudo guardar el resultado de esta partida.", "error");
             }
         };
 
@@ -92,11 +96,11 @@ export default function PlayPage() {
 
     return (
         <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
-            <div className="w-full max-w-[800px] flex justify-between items-center mb-4 text-white">
-                <h1 className="text-xl font-bold">MateFácil - Zona de Juego</h1>
+            <div className="w-full max-w-[800px] flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center mb-4 text-white">
+                <h1 className="text-lg sm:text-xl font-bold">MateFácil - Zona de Juego</h1>
                 <button
                     onClick={() => window.history.back()}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition"
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition self-start sm:self-auto"
                 >
                     Volver al Panel
                 </button>

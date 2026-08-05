@@ -2,12 +2,14 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import api from "@/config/api";
+import { useToast } from "@/components/ToastProvider";
 
-import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 export default function StatsPage() {
     const router = useRouter();
     const params = useParams();
+    const { showToast } = useToast();
 
     const [stats, setStats] = useState({
         avgTime: "0s",
@@ -37,6 +39,12 @@ export default function StatsPage() {
 
                 const emocionesMap: Record<number, string> = { 1: "Frustrado", 2: "Feliz", 3: "Muy Feliz" };
                 const dificultadMap: Record<number, string> = { 1: "Fácil", 2: "Media", 3: "Difícil",4: "Custom" };
+                const operacionMap: Record<string, string> = {
+                    suma: "Suma",
+                    resta: "Resta",
+                    multiplicacion: "Multiplicación",
+                    division: "División"
+                };
 
                 setStats({
                     avgTime: timeString,
@@ -58,12 +66,14 @@ export default function StatsPage() {
                             date: formattedDate,
                             score: session.score,
                             emotion: emocionesMap[session.emotion] || "Feliz",
-                            difficulty: dificultadMap[sessionDifficultyNum] || "Normal"
+                            difficulty: dificultadMap[sessionDifficultyNum] || "Normal",
+                            operation: operacionMap[session.operacion] || "Sin registrar"
                         };
                     })
                 });
             } catch (error) {
                 console.error("Error al cargar estadisticas", error);
+                showToast("No se pudieron cargar las estadísticas del alumno.", "error");
             } finally {
                 setIsLoading(false);
             }
@@ -108,6 +118,22 @@ export default function StatsPage() {
             <span className={`${styles} text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide`}>
             {level}
         </span>
+        );
+    };
+    const getOperationBadge = (operation: string) => {
+        const colorMap: Record<string, string> = {
+            "Suma": "bg-blue-100 text-blue-700",
+            "Resta": "bg-orange-100 text-orange-700",
+            "Multiplicación": "bg-purple-100 text-purple-700",
+            "División": "bg-pink-100 text-pink-700",
+        };
+
+        const styles = colorMap[operation] || "bg-gray-100 text-gray-500";
+
+        return (
+            <span className={`${styles} px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide`}>
+                {operation}
+            </span>
         );
     };
 
@@ -193,10 +219,16 @@ export default function StatsPage() {
                     </div>
 
                     <div className="overflow-x-auto">
+                        {isLoading ? (
+                            <div className="p-10 flex justify-center text-gray-400">
+                                <Loader2 size={24} className="animate-spin" />
+                            </div>
+                        ) : (
                         <table className="min-w-full text-left text-sm">
                             <thead className="bg-gray-100 text-gray-600 uppercase">
                             <tr>
                                 <th className="px-6 py-3 whitespace-nowrap">Fecha</th>
+                                <th className="px-6 py-3 whitespace-nowrap">Operación</th>
                                 <th className="px-6 py-3 whitespace-nowrap">Dificultad</th>
                                 <th className="px-6 py-3 whitespace-nowrap">Puntaje</th>
                                 <th className="px-6 py-3 whitespace-nowrap">Emoción Final</th>
@@ -207,6 +239,9 @@ export default function StatsPage() {
                             {currentSessions.map((session, index) => (
                                 <tr key={index} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-3">{session.date}</td>
+                                    <td className="px-6 py-3">
+                                        {getOperationBadge(session.operation)}
+                                    </td>
                                     <td className="px-6 py-3">
                                         {getDifficultyBadge(session.difficulty)}
                                     </td>
@@ -220,8 +255,9 @@ export default function StatsPage() {
                             ))}
                             </tbody>
                         </table>
+                        )}
 
-                        {/* Mensaje de estado de carga o sin datos (Opcional) */}
+                        {/* Mensaje de sin datos */}
                         {!isLoading && stats.recentSessions.length === 0 && (
                             <div className="p-6 text-center text-gray-500">
                                 No hay sesiones registradas aún.
