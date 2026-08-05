@@ -1,21 +1,23 @@
 import * as Phaser from 'phaser';
 
 export const MapConfig = {
-    // Coordenadas de los puntos del Mapa Tierra
+    // Coordenadas de los puntos del Mapa Tierra (centros medidos sobre
+    // mapa_tierra.png, 800x618, escalados al lienzo de 800x600 del juego)
     pointDataTierra: [
-        { x: 190, y: 580 }, // Punto 1
-        { x: 280, y: 230 }, // Punto 2
-        { x: 425, y: 450 }, // Punto 3
-        { x: 580, y: 560 }, // Punto 4
-        { x: 750, y: 220 } // Punto 5
+        { x: 170, y: 532 }, // Punto 1 (circulo verde)
+        { x: 253, y: 211 }, // Punto 2 (circulo amarillo)
+        { x: 380, y: 407 }, // Punto 3 (circulo morado)
+        { x: 515, y: 502 }, // Punto 4 (circulo azul)
+        { x: 687, y: 211 } // Punto 5 (circulo rosa)
     ],
-    // Coordenadas de los puntos del Mapa Agua
+    // Coordenadas de los puntos del Mapa Agua (centros medidos sobre
+    // mapa_agua.png, 800x618, escalados al lienzo de 800x600 del juego)
     pointDataAgua: [
-        { x: 120, y: 580 }, // Punto 1
-        { x: 300, y: 180 }, // Punto 2
-        { x: 394, y: 344 }, // Punto 3
-        { x: 683, y: 504 },  // Punto 4 X+20
-        { x: 700, y: 236 }  //Punto 5
+        { x: 104, y: 522 }, // Punto 1 (circulo verde)
+        { x: 275, y: 169 }, // Punto 2 (circulo amarillo)
+        { x: 362, y: 315 }, // Punto 3 (circulo morado)
+        { x: 626, y: 463 }, // Punto 4 (circulo azul)
+        { x: 630, y: 207 } // Punto 5 (circulo rosa)
     ]
 };
 
@@ -29,13 +31,27 @@ export const EventBus = new Phaser.Events.EventEmitter();
 // ==========================================
 export class MathStrategy {
     private targetNumbers: number[];
+    private operation?: string;
 
-    constructor(targets: number[]) {
+    constructor(targets: number[], operation?: string) {
         this.targetNumbers = targets;
+        this.operation = operation;
+    }
+
+    // Resta y division no son conmutativas: el orden de recoleccion debe
+    // coincidir con el orden en que se genero el ejercicio (mayor->menor,
+    // dividendo->divisor), o el resultado real seria distinto al esperado.
+    private get isOrderSensitive(): boolean {
+        return this.operation === 'resta' || this.operation === 'division';
     }
 
     validate(numbersCollected: number[]): boolean {
         if (numbersCollected.length !== this.targetNumbers.length) return false;
+
+        if (this.isOrderSensitive) {
+            return numbersCollected.every((num, i) => num === this.targetNumbers[i]);
+        }
+
         return this.targetNumbers.every(target => numbersCollected.includes(target));
     }
 }

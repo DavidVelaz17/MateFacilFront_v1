@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import api from "@/config/api";
-import { Edit, Trash2, Plus, X, ShieldAlert, Users, LogOut, Menu, Loader2 } from "lucide-react";
+import { Edit, Trash2, Plus, X, ShieldAlert, Users, LogOut, Menu, Loader2, GraduationCap, UserCheck, UserX } from "lucide-react";
 import IconButton from "../components/IconButton";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,11 +17,21 @@ interface Teacher {
     Password?: string;
 }
 
+interface Student {
+    id_discente: number;
+    Nombre_Discente: string;
+    Apellido_Paterno_Discente: string;
+    Apellido_Materno_Discente: string;
+    Activo?: boolean;
+}
+
 export default function AdminDashboard() {
     const { docenteId, logout } = useAuth();
     const { showToast } = useToast();
 
     // --- ESTADOS ---
+    const [activeView, setActiveView] = useState<'docentes' | 'alumnos'>('docentes');
+
     const [teachers, setTeachers] = useState<Teacher[]>([]);
     const [isLoadingTeachers, setIsLoadingTeachers] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,11 +51,26 @@ export default function AdminDashboard() {
         Password: ""
     });
 
+    // --- ESTADOS DE ALUMNOS ---
+    const [students, setStudents] = useState<Student[]>([]);
+    const [isLoadingStudents, setIsLoadingStudents] = useState(true);
+    const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+    const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+    const [studentFormData, setStudentFormData] = useState({
+        Nombre_Discente: "",
+        Apellido_Paterno_Discente: "",
+        Apellido_Materno_Discente: ""
+    });
+    const [togglingStudentId, setTogglingStudentId] = useState<number | null>(null);
+    const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+    const [isDeletingStudent, setIsDeletingStudent] = useState(false);
+
     // --- EFECTOS ---
-    // Una vez que useAuth confirma la sesion (docenteId listo), cargamos los docentes
+    // Una vez que useAuth confirma la sesion (docenteId listo), cargamos los docentes y alumnos
     useEffect(() => {
         if (docenteId !== null) {
             fetchTeachers();
+            fetchStudents();
         }
     }, [docenteId]);
 
@@ -135,6 +160,88 @@ export default function AdminDashboard() {
         }
     };
 
+    // --- MANEJADORES DE ALUMNOS (CRUD) ---
+    const fetchStudents = async () => {
+        setIsLoadingStudents(true);
+        try {
+            const response = await api.get("/discentes");
+            setStudents(response.data);
+        } catch (error) {
+            console.error("Error al cargar alumnos desde la BD:", error);
+            showToast("No se pudieron cargar los alumnos.", "error");
+        } finally {
+            setIsLoadingStudents(false);
+        }
+    };
+
+    const handleOpenAddStudent = () => {
+        setEditingStudent(null);
+        setStudentFormData({ Nombre_Discente: "", Apellido_Paterno_Discente: "", Apellido_Materno_Discente: "" });
+        setIsStudentModalOpen(true);
+    };
+
+    const handleOpenEditStudent = (student: Student) => {
+        setEditingStudent(student);
+        setStudentFormData({
+            Nombre_Discente: student.Nombre_Discente,
+            Apellido_Paterno_Discente: student.Apellido_Paterno_Discente,
+            Apellido_Materno_Discente: student.Apellido_Materno_Discente
+        });
+        setIsStudentModalOpen(true);
+    };
+
+    const handleStudentSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            if (editingStudent) {
+                await api.patch(`/discentes/${editingStudent.id_discente}`, studentFormData);
+            } else {
+                await api.post("/discentes", studentFormData);
+            }
+            setIsStudentModalOpen(false);
+            showToast(editingStudent ? "Alumno actualizado correctamente." : "Alumno creado correctamente.", "success");
+            fetchStudents();
+        } catch (error) {
+            console.error("Error al guardar alumno:", error);
+            const mensaje = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
+            showToast(Array.isArray(mensaje) ? mensaje[0] : mensaje || "Hubo un error al guardar el alumno.", "error");
+        }
+    };
+
+    // Dar de baja / reactivar: a diferencia de eliminar, es reversible y no
+    // borra el historial de intentos del alumno.
+    const handleToggleActiveStudent = async (student: Student) => {
+        setTogglingStudentId(student.id_discente);
+        try {
+            const isCurrentlyActive = student.Activo !== false;
+            const nextActivo = !isCurrentlyActive;
+            await api.patch(`/discentes/${student.id_discente}`, { Activo: nextActivo });
+            showToast(nextActivo ? "Alumno reactivado." : "Alumno dado de baja.", "success");
+            fetchStudents();
+        } catch (error) {
+            console.error("Error al cambiar el estado del alumno:", error);
+            showToast("Hubo un error al actualizar el estado del alumno.", "error");
+        } finally {
+            setTogglingStudentId(null);
+        }
+    };
+
+    const confirmDeleteStudent = async () => {
+        if (!studentToDelete) return;
+        setIsDeletingStudent(true);
+        try {
+            await api.delete(`/discentes/${studentToDelete.id_discente}`);
+            setStudentToDelete(null);
+            showToast("Alumno eliminado.", "success");
+            fetchStudents();
+        } catch (error) {
+            console.error("Error al eliminar alumno:", error);
+            showToast("Hubo un error al eliminar el alumno.", "error");
+        } finally {
+            setIsDeletingStudent(false);
+        }
+    };
+
     return (
         <div className="flex h-screen bg-gray-50 text-black overflow-hidden relative">
 
@@ -160,9 +267,27 @@ export default function AdminDashboard() {
 
                 <nav className="flex-1 p-4 overflow-y-auto">
                     <ul className="space-y-2">
-                        <li className="flex items-center gap-3 p-3 bg-red-600/20 text-red-400 border-l-4 border-red-500 rounded-lg cursor-pointer">
+                        <li
+                            onClick={() => { setActiveView('docentes'); setIsSidebarOpen(false); }}
+                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border-l-4 transition-colors ${
+                                activeView === 'docentes'
+                                    ? "bg-red-600/20 text-red-400 border-red-500"
+                                    : "text-slate-400 border-transparent hover:bg-slate-800 hover:text-slate-200"
+                            }`}
+                        >
                             <Users size={20} />
                             <span className="font-semibold">Gestión de Docentes</span>
+                        </li>
+                        <li
+                            onClick={() => { setActiveView('alumnos'); setIsSidebarOpen(false); }}
+                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border-l-4 transition-colors ${
+                                activeView === 'alumnos'
+                                    ? "bg-red-600/20 text-red-400 border-red-500"
+                                    : "text-slate-400 border-transparent hover:bg-slate-800 hover:text-slate-200"
+                            }`}
+                        >
+                            <GraduationCap size={20} />
+                            <span className="font-semibold">Gestión de Alumnos</span>
                         </li>
                     </ul>
                 </nav>
@@ -182,67 +307,148 @@ export default function AdminDashboard() {
             <main className="flex-1 overflow-y-auto p-4 sm:p-8 relative">
                 <div className="max-w-6xl mx-auto">
 
-                    <header className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-8 border-b border-gray-200 pb-6">
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setIsSidebarOpen(true)}
-                                className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-200 rounded-lg"
-                                aria-label="Abrir menú"
-                            >
-                                <Menu size={22} />
-                            </button>
-                            <div>
-                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Directorio de Docentes</h1>
-                                <p className="text-gray-500 mt-1">Administra los accesos de los profesores a la plataforma</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={handleOpenAdd}
-                            className="flex items-center justify-center gap-2 bg-slate-800 text-white px-5 py-2.5 rounded-lg hover:bg-slate-900 transition shadow-lg font-medium shrink-0"
-                        >
-                            <Plus size={20} /> Registrar Docente
-                        </button>
-                    </header>
+                    {activeView === 'docentes' ? (
+                        <>
+                            <header className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-8 border-b border-gray-200 pb-6">
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => setIsSidebarOpen(true)}
+                                        className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-200 rounded-lg"
+                                        aria-label="Abrir menú"
+                                    >
+                                        <Menu size={22} />
+                                    </button>
+                                    <div>
+                                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Directorio de Docentes</h1>
+                                        <p className="text-gray-500 mt-1">Administra los accesos de los profesores a la plataforma</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleOpenAdd}
+                                    className="flex items-center justify-center gap-2 bg-slate-800 text-white px-5 py-2.5 rounded-lg hover:bg-slate-900 transition shadow-lg font-medium shrink-0"
+                                >
+                                    <Plus size={20} /> Registrar Docente
+                                </button>
+                            </header>
 
-                    <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-                        <div className="overflow-x-auto">
-                        <table className="min-w-full leading-normal">
-                            <thead>
-                            <tr className="bg-slate-50 text-slate-600 uppercase text-xs font-bold tracking-wider">
-                                <th className="py-4 px-6 text-left border-b border-gray-200">Nombre Completo</th>
-                                <th className="py-4 px-6 text-left border-b border-gray-200">Usuario de Acceso</th>
-                                <th className="py-4 px-6 text-center border-b border-gray-200">Acciones</th>
-                            </tr>
-                            </thead>
-                            <tbody className="text-gray-700 text-sm">
-                            {isLoadingTeachers ? (
-                                <tr><td colSpan={3} className="text-center py-10 text-gray-400"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
-                            ) : teachers.length === 0 ? (
-                                <tr><td colSpan={3} className="text-center py-8 text-gray-500 italic">No hay docentes registrados</td></tr>
-                            ) : (
-                                teachers.map((teacher) => (
-                                    <tr key={teacher.id_docente} className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
-                                        <td className="py-4 px-6 text-left font-medium">
-                                            {teacher.Apellido_Paterno_Docente} {teacher.Apellido_Materno_Docente} {teacher.Nombre_Docente}
-                                        </td>
-                                        <td className="py-4 px-6 text-left">
-                                            <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-mono">
-                                              {teacher.Usuario}
-                                            </span>
-                                        </td>
-                                        <td className="py-4 px-6 text-center">
-                                            <div className="flex item-center justify-center gap-3">
-                                                <IconButton icon={<Edit size={18} />} label="Modificar" onClick={() => handleOpenEdit(teacher)} color="text-blue-500" />
-                                                <IconButton icon={<Trash2 size={18} />} label="Eliminar" onClick={() => handleDelete(teacher)} color="text-red-500" />
-                                            </div>
-                                        </td>
+                            <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                <table className="min-w-full leading-normal">
+                                    <thead>
+                                    <tr className="bg-slate-50 text-slate-600 uppercase text-xs font-bold tracking-wider">
+                                        <th className="py-4 px-6 text-left border-b border-gray-200">Nombre Completo</th>
+                                        <th className="py-4 px-6 text-left border-b border-gray-200">Usuario de Acceso</th>
+                                        <th className="py-4 px-6 text-center border-b border-gray-200">Acciones</th>
                                     </tr>
-                                ))
-                            )}
-                            </tbody>
-                        </table>
-                        </div>
-                    </div>
+                                    </thead>
+                                    <tbody className="text-gray-700 text-sm">
+                                    {isLoadingTeachers ? (
+                                        <tr><td colSpan={3} className="text-center py-10 text-gray-400"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
+                                    ) : teachers.length === 0 ? (
+                                        <tr><td colSpan={3} className="text-center py-8 text-gray-500 italic">No hay docentes registrados</td></tr>
+                                    ) : (
+                                        teachers.map((teacher) => (
+                                            <tr key={teacher.id_docente} className="border-b border-gray-100 hover:bg-slate-50 transition-colors">
+                                                <td className="py-4 px-6 text-left font-medium">
+                                                    {teacher.Apellido_Paterno_Docente} {teacher.Apellido_Materno_Docente} {teacher.Nombre_Docente}
+                                                </td>
+                                                <td className="py-4 px-6 text-left">
+                                                    <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-mono">
+                                                      {teacher.Usuario}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-6 text-center">
+                                                    <div className="flex item-center justify-center gap-3">
+                                                        <IconButton icon={<Edit size={18} />} label="Modificar" onClick={() => handleOpenEdit(teacher)} color="text-blue-500" />
+                                                        <IconButton icon={<Trash2 size={18} />} label="Eliminar" onClick={() => handleDelete(teacher)} color="text-red-500" />
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                    </tbody>
+                                </table>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <header className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-8 border-b border-gray-200 pb-6">
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => setIsSidebarOpen(true)}
+                                        className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-200 rounded-lg"
+                                        aria-label="Abrir menú"
+                                    >
+                                        <Menu size={22} />
+                                    </button>
+                                    <div>
+                                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Directorio de Alumnos</h1>
+                                        <p className="text-gray-500 mt-1">Administra los registros de alumnos de toda la plataforma</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleOpenAddStudent}
+                                    className="flex items-center justify-center gap-2 bg-slate-800 text-white px-5 py-2.5 rounded-lg hover:bg-slate-900 transition shadow-lg font-medium shrink-0"
+                                >
+                                    <Plus size={20} /> Agregar Alumno
+                                </button>
+                            </header>
+
+                            <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                <table className="min-w-full leading-normal">
+                                    <thead>
+                                    <tr className="bg-slate-50 text-slate-600 uppercase text-xs font-bold tracking-wider">
+                                        <th className="py-4 px-6 text-left border-b border-gray-200">Nombre Completo</th>
+                                        <th className="py-4 px-6 text-left border-b border-gray-200">Estado</th>
+                                        <th className="py-4 px-6 text-center border-b border-gray-200">Acciones</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody className="text-gray-700 text-sm">
+                                    {isLoadingStudents ? (
+                                        <tr><td colSpan={3} className="text-center py-10 text-gray-400"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
+                                    ) : students.length === 0 ? (
+                                        <tr><td colSpan={3} className="text-center py-8 text-gray-500 italic">No hay alumnos registrados</td></tr>
+                                    ) : (
+                                        students.map((student) => {
+                                            const isActive = student.Activo !== false;
+                                            return (
+                                                <tr key={student.id_discente} className={`border-b border-gray-100 hover:bg-slate-50 transition-colors ${!isActive ? "opacity-60" : ""}`}>
+                                                    <td className="py-4 px-6 text-left font-medium">
+                                                        {student.Apellido_Paterno_Discente} {student.Apellido_Materno_Discente} {student.Nombre_Discente}
+                                                    </td>
+                                                    <td className="py-4 px-6 text-left">
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                                            isActive ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"
+                                                        }`}>
+                                                            {isActive ? "Activo" : "Dado de baja"}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-6 text-center">
+                                                        <div className="flex item-center justify-center gap-3">
+                                                            <IconButton icon={<Edit size={18} />} label="Modificar" onClick={() => handleOpenEditStudent(student)} color="text-blue-500" />
+                                                            <IconButton
+                                                                icon={togglingStudentId === student.id_discente
+                                                                    ? <Loader2 size={18} className="animate-spin" />
+                                                                    : isActive ? <UserX size={18} /> : <UserCheck size={18} />}
+                                                                label={isActive ? "Dar de baja" : "Reactivar"}
+                                                                onClick={() => handleToggleActiveStudent(student)}
+                                                                color={isActive ? "text-amber-500" : "text-emerald-600"}
+                                                            />
+                                                            <IconButton icon={<Trash2 size={18} />} label="Eliminar" onClick={() => setStudentToDelete(student)} color="text-red-500" />
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                    </tbody>
+                                </table>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             </main>
 
@@ -327,6 +533,80 @@ export default function AdminDashboard() {
                                 Se eliminarán esos grupos y se desvincularán sus alumnos.
                             </p>
                         )
+                    }
+                />
+            )}
+
+            {/* ================= MODAL DE ALUMNO ================= */}
+            {isStudentModalOpen && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative overflow-hidden ring-1 ring-gray-200">
+                        <div className="bg-slate-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                <GraduationCap size={20} className="text-red-500"/>
+                                {editingStudent ? "Editar Alumno" : "Nuevo Alumno"}
+                            </h2>
+                            <button onClick={() => setIsStudentModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-200">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleStudentSubmit} className="p-6">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre(s)</label>
+                                    <input
+                                        value={studentFormData.Nombre_Discente}
+                                        onChange={(e) => setStudentFormData({...studentFormData, Nombre_Discente: e.target.value})}
+                                        className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none text-gray-900 bg-white"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Paterno</label>
+                                    <input
+                                        value={studentFormData.Apellido_Paterno_Discente}
+                                        onChange={(e) => setStudentFormData({...studentFormData, Apellido_Paterno_Discente: e.target.value})}
+                                        className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none text-gray-900 bg-white"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Materno</label>
+                                    <input
+                                        value={studentFormData.Apellido_Materno_Discente}
+                                        onChange={(e) => setStudentFormData({...studentFormData, Apellido_Materno_Discente: e.target.value})}
+                                        className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none text-gray-900 bg-white"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
+                                <button type="button" onClick={() => setIsStudentModalOpen(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition font-medium">Cancelar</button>
+                                <button type="submit" className="px-6 py-2 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition shadow-md">
+                                    {editingStudent ? "Guardar Cambios" : "Crear Alumno"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ================= MODAL DE CONFIRMACIÓN DE BORRADO DE ALUMNO ================= */}
+            {studentToDelete && (
+                <ConfirmDeleteModal
+                    title="Eliminar Alumno"
+                    isDeleting={isDeletingStudent}
+                    onConfirm={confirmDeleteStudent}
+                    onCancel={() => setStudentToDelete(null)}
+                    message={
+                        <>
+                            ¿Estás seguro de que deseas eliminar a{" "}
+                            <span className="font-semibold">
+                                {studentToDelete.Nombre_Discente} {studentToDelete.Apellido_Paterno_Discente}
+                            </span>{" "}
+                            del sistema? Se perderá su historial de intentos. Esta acción no se puede deshacer.
+                        </>
                     }
                 />
             )}

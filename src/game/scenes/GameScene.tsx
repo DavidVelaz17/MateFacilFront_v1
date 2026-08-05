@@ -102,7 +102,11 @@ export class GameScene extends Phaser.Scene {
 
         this.physics.world.setBounds(0, 0, gameWidth, playableHeight);
 
-        const backgroundKey = this.currentElement === 'agua' ? 'bg_agua' : 'bg_tierra';
+        // En PC (sin touch) mostramos el fondo con el tutorial de controles de teclado.
+        const isTouchDevice = this.sys.game.device.input.touch;
+        const backgroundKey = this.currentElement === 'agua'
+            ? (isTouchDevice ? 'bg_agua' : 'bg_agua_tutorial')
+            : (isTouchDevice ? 'bg_tierra' : 'bg_tierra_tutorial');
         const barBgKey = this.currentElement === 'agua' ? 'bar_bg_agua' : 'bar_bg_tierra';
         const platformKey = this.currentElement === 'agua' ? 'platform_agua' : 'platform_tierra';
         this.add.image(0, 0, backgroundKey)
@@ -126,7 +130,7 @@ export class GameScene extends Phaser.Scene {
         this.player.setBounce(0.1).setCollideWorldBounds(true);
 
         this.emotionState = new EmotionContext(this.player, this.ui.getEmotionImageObject());
-        this.doorStrategy = new MathStrategy(this.levelConfig.targetNumbers);
+        this.doorStrategy = new MathStrategy(this.levelConfig.targetNumbers, this.levelData?.operation);
         this.itemsGroup = level.items;
 
         this.physics.add.collider(this.player, level.platforms);
@@ -257,7 +261,14 @@ export class GameScene extends Phaser.Scene {
 
         if (numItem.itemType === 'number') {
             this.gameState.collectedNumbers.push(numItem.itemValue);
-            const isCorrectNumber = this.levelConfig.targetNumbers.includes(numItem.itemValue);
+
+            // Resta y division no son conmutativas: la cifra recogida debe
+            // coincidir con la posicion esperada, no solo con el conjunto.
+            const isOrderSensitive = this.levelData?.operation === 'resta' || this.levelData?.operation === 'division';
+            const collectedIndex = this.gameState.collectedNumbers.length - 1;
+            const isCorrectNumber = isOrderSensitive
+                ? this.levelConfig.targetNumbers[collectedIndex] === numItem.itemValue
+                : this.levelConfig.targetNumbers.includes(numItem.itemValue);
 
             if (!isCorrectNumber) {
                 this.emotionState.transitionTo(new SadState());
@@ -359,7 +370,8 @@ export class GameScene extends Phaser.Scene {
             Dificultad: this.currentDifficulty,
             Puntos: (estrellasObtenidas * 20) + this.getTiempoBonus(tiempoFinal),
             Emocion: estrellasObtenidas === 3 ? 3 : 2,
-            Monedas: estrellasObtenidas
+            Monedas: estrellasObtenidas,
+            Operacion: this.levelData.operation
         };
         EventBus.emit('gameOverStats', stats);
 
@@ -416,7 +428,8 @@ export class GameScene extends Phaser.Scene {
             Dificultad: this.currentDifficulty,
             Puntos: 0,
             Emocion: 1,
-            Monedas: 0
+            Monedas: 0,
+            Operacion: this.levelData.operation
         };
         EventBus.emit('gameOverStats', stats);
 

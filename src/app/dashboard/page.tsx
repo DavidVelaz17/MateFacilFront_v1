@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import {
     Edit, Trash2, Play, BarChart2, Plus, X,
-    Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut, Menu, Loader2
+    Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut, Menu, Loader2, Search, Star
 } from "lucide-react";
 import IconButton from "../components/IconButton";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
@@ -26,6 +26,8 @@ interface Student {
     Apellido_Paterno_Discente: string;
     Apellido_Materno_Discente: string;
     grupos?: Group[];
+    Activo?: boolean;
+    totalStars?: number;
 }
 
 interface GameConfig {
@@ -39,6 +41,15 @@ interface GameConfig {
     resultado: string;
     numTrampas: number;
     trampas: string[];
+}
+
+// Quita acentos/diacríticos para que la búsqueda encuentre "Sofía" al
+// escribir "sofia", sin importar mayúsculas.
+function normalizeSearchText(value: string): string {
+    return value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
 }
 
 export default function Dashboard() {
@@ -72,6 +83,10 @@ export default function Dashboard() {
         Apellido_Paterno_Discente: "",
         Apellido_Materno_Discente: ""
     });
+    // Pestaña del modal de alumno: crear uno nuevo o buscar uno ya existente
+    const [studentModalTab, setStudentModalTab] = useState<'nuevo' | 'existente'>('nuevo');
+    const [studentSearchQuery, setStudentSearchQuery] = useState("");
+    const [isAddingExistingStudent, setIsAddingExistingStudent] = useState(false);
 
     // Estados para el modal de confirmacion de borrado de alumno
     const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
@@ -156,15 +171,34 @@ export default function Dashboard() {
         }
     };
 
+    // Los alumnos dados de baja por el administrador no se gestionan desde aqui
+    const activeStudents = students.filter(student => student.Activo !== false);
+
     // Solo nos quedamos con los alumnos que tengan el ID del grupo activo
-    const filteredStudents = students.filter(student =>
+    const filteredStudents = activeStudents.filter(student =>
         student.grupos?.some(g => g.id_grupo === activeGroupId)
     );
+
+    // Alumnos que aun no pertenecen al grupo activo, candidatos para la busqueda
+    const studentsAvailableToAdd = activeStudents.filter(student =>
+        !student.grupos?.some(g => g.id_grupo === activeGroupId)
+    );
+
+    const studentSearchResults = studentSearchQuery.trim() === ""
+        ? studentsAvailableToAdd
+        : studentsAvailableToAdd.filter(student => {
+            const fullName = normalizeSearchText(
+                `${student.Nombre_Discente} ${student.Apellido_Paterno_Discente} ${student.Apellido_Materno_Discente}`
+            );
+            return fullName.includes(normalizeSearchText(studentSearchQuery.trim()));
+        });
 
     // --- MANEJADORES DE ALUMNOS (CRUD) ---
     const handleOpenAddStudent = () => {
         setEditingStudent(null);
         setStudentFormData({ Nombre_Discente: "", Apellido_Paterno_Discente: "", Apellido_Materno_Discente: "" });
+        setStudentModalTab('nuevo');
+        setStudentSearchQuery('');
         setIsStudentModalOpen(true);
     };
 
@@ -201,6 +235,30 @@ export default function Dashboard() {
             console.error("Error al guardar alumno", error);
             const mensaje = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
             showToast(Array.isArray(mensaje) ? mensaje[0] : mensaje || "Error al guardar el alumno.", "error");
+        }
+    };
+
+    const handleAddExistingStudent = async (student: Student) => {
+        if (!activeGroupId) return;
+        setIsAddingExistingStudent(true);
+        try {
+            const currentGroupIds = (student.grupos || []).map(g => g.id_grupo);
+            const nextGroupIds = currentGroupIds.includes(activeGroupId)
+                ? currentGroupIds
+                : [...currentGroupIds, activeGroupId];
+
+            await api.patch(`/discentes/${student.id_discente}`, {
+                grupos: nextGroupIds.map(id_grupo => ({ id_grupo }))
+            });
+            setIsStudentModalOpen(false);
+            showToast("Alumno agregado al grupo.", "success");
+            fetchStudents();
+        } catch (error) {
+            console.error("Error al agregar alumno existente", error);
+            const mensaje = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
+            showToast(Array.isArray(mensaje) ? mensaje[0] : mensaje || "Error al agregar el alumno.", "error");
+        } finally {
+            setIsAddingExistingStudent(false);
         }
     };
 
@@ -347,7 +405,7 @@ export default function Dashboard() {
                                         }`}
                                     >
                                         <span className="truncate pr-2">
-                                            <strong className="font-medium text-gray-200">{group.Grado}°</strong> - {group.Nombre_Grupo}
+                                            <strong className="font-medium text-gray-200">{group.Grado}°</strong> - {group.Nombre_Grupo} <span className="text-gray-500">({group.Año})</span>
                                         </span>
 
                                         <div className="hidden group-hover:flex items-center gap-1">
@@ -376,7 +434,7 @@ export default function Dashboard() {
 
                 <div className="p-4 border-t border-gray-800 text-sm flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center font-bold text-gray-300">
-                        P
+                        {docenteName?.trim().charAt(0).toUpperCase() || "P"}
                     </div>
                     <div className="flex flex-col items-start">
                         <p className="font-semibold text-gray-200">{docenteName}</p>
@@ -406,7 +464,7 @@ export default function Dashboard() {
                             <div>
                                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
                                     {activeGroupId && groups.find(g => g.id_grupo === activeGroupId)
-                                        ? `${groups.find(g => g.id_grupo === activeGroupId)?.Grado}° - ${groups.find(g => g.id_grupo === activeGroupId)?.Nombre_Grupo}`
+                                        ? `${groups.find(g => g.id_grupo === activeGroupId)?.Grado}° - ${groups.find(g => g.id_grupo === activeGroupId)?.Nombre_Grupo} (${groups.find(g => g.id_grupo === activeGroupId)?.Año})`
                                         : "Selecciona un grupo"}
                                 </h1>
                                 <p className="text-gray-500 mt-1">Gestión de alumnos inscritos</p>
@@ -430,20 +488,27 @@ export default function Dashboard() {
                                 <thead>
                                 <tr className="bg-gray-50 text-gray-600 uppercase text-xs font-bold tracking-wider">
                                     <th className="py-4 px-6 text-left border-b border-gray-200">Nombre Completo</th>
+                                    <th className="py-4 px-6 text-center border-b border-gray-200">Estrellas</th>
                                     <th className="py-4 px-6 text-center border-b border-gray-200">Acciones</th>
                                 </tr>
                                 </thead>
                                 <tbody className="text-gray-700 text-sm">
                                 {/* CORRECCIÓN: Usamos filteredStudents en lugar de todos los students */}
                                 {isLoadingStudents ? (
-                                    <tr><td colSpan={2} className="text-center py-10 text-gray-400"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
+                                    <tr><td colSpan={3} className="text-center py-10 text-gray-400"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
                                 ) : filteredStudents.length === 0 ? (
-                                    <tr><td colSpan={2} className="text-center py-8 text-gray-500 italic">No hay alumnos en este grupo</td></tr>
+                                    <tr><td colSpan={3} className="text-center py-8 text-gray-500 italic">No hay alumnos en este grupo</td></tr>
                                 ) : (
                                     filteredStudents.map((student) => (
                                         <tr key={student.id_discente} className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors">
                                             <td className="py-4 px-6 text-left font-medium">
                                                 {student.Apellido_Paterno_Discente} {student.Apellido_Materno_Discente} {student.Nombre_Discente}
+                                            </td>
+                                            <td className="py-4 px-6 text-center">
+                                                <span className="inline-flex items-center gap-1 font-semibold text-amber-600">
+                                                    <Star size={16} className="fill-amber-400 text-amber-500" />
+                                                    {student.totalStars ?? 0}
+                                                </span>
                                             </td>
                                             <td className="py-4 px-6 text-center">
                                                 <div className="flex item-center justify-center gap-3">
@@ -485,47 +550,118 @@ export default function Dashboard() {
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative overflow-hidden ring-1 ring-gray-200">
                         <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                             <h2 className="text-xl font-bold text-gray-800">
-                                {editingStudent ? "Editar Alumno" : "Nuevo Alumno"}
+                                {editingStudent ? "Editar Alumno" : "Agregar Alumno"}
                             </h2>
                             <button onClick={() => setIsStudentModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-200">
                                 <X size={20} />
                             </button>
                         </div>
-                        <form onSubmit={handleStudentSubmit} className="p-6">
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre(s)</label>
+
+                        {!editingStudent && (
+                            <div className="flex gap-2 px-6 pt-3 border-b border-gray-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setStudentModalTab('nuevo')}
+                                    className={`px-4 py-2 text-sm font-semibold transition border-b-2 ${
+                                        studentModalTab === 'nuevo'
+                                            ? 'text-blue-600 border-blue-600'
+                                            : 'text-gray-500 border-transparent hover:text-gray-700'
+                                    }`}
+                                >
+                                    Nuevo alumno
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setStudentModalTab('existente')}
+                                    className={`px-4 py-2 text-sm font-semibold transition border-b-2 ${
+                                        studentModalTab === 'existente'
+                                            ? 'text-blue-600 border-blue-600'
+                                            : 'text-gray-500 border-transparent hover:text-gray-700'
+                                    }`}
+                                >
+                                    Alumno existente
+                                </button>
+                            </div>
+                        )}
+
+                        {!editingStudent && studentModalTab === 'existente' ? (
+                            <div className="p-6">
+                                <div className="relative mb-4">
+                                    <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                     <input
-                                        value={studentFormData.Nombre_Discente}
-                                        onChange={(e) => setStudentFormData({...studentFormData, Nombre_Discente: e.target.value})}
-                                        className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
-                                        required
+                                        type="text"
+                                        autoFocus
+                                        value={studentSearchQuery}
+                                        onChange={(e) => setStudentSearchQuery(e.target.value)}
+                                        placeholder="Buscar por nombre o apellido..."
+                                        className="w-full border border-gray-300 pl-10 pr-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Paterno</label>
-                                    <input
-                                        value={studentFormData.Apellido_Paterno_Discente}
-                                        onChange={(e) => setStudentFormData({...studentFormData, Apellido_Paterno_Discente: e.target.value})}
-                                        className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
-                                        required
-                                    />
+                                <div className="max-h-72 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-100">
+                                    {studentSearchResults.length === 0 ? (
+                                        <p className="text-center text-sm text-gray-500 italic py-6 px-4">
+                                            {studentSearchQuery.trim() === ""
+                                                ? "No hay más alumnos disponibles para agregar."
+                                                : "No se encontraron alumnos con ese nombre."}
+                                        </p>
+                                    ) : (
+                                        studentSearchResults.map((student) => (
+                                            <button
+                                                type="button"
+                                                key={student.id_discente}
+                                                onClick={() => handleAddExistingStudent(student)}
+                                                disabled={isAddingExistingStudent}
+                                                className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors flex items-center justify-between gap-3 disabled:opacity-50"
+                                            >
+                                                <span className="text-gray-800 font-medium">
+                                                    {student.Apellido_Paterno_Discente} {student.Apellido_Materno_Discente} {student.Nombre_Discente}
+                                                </span>
+                                                <Plus size={16} className="text-blue-600 shrink-0" />
+                                            </button>
+                                        ))
+                                    )}
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Materno</label>
-                                    <input
-                                        value={studentFormData.Apellido_Materno_Discente}
-                                        onChange={(e) => setStudentFormData({...studentFormData, Apellido_Materno_Discente: e.target.value})}
-                                        className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
-                                        required
-                                    />
+                                <div className="flex justify-end mt-6 pt-4 border-t border-gray-100">
+                                    <button type="button" onClick={() => setIsStudentModalOpen(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition font-medium">Cancelar</button>
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
-                                <button type="button" onClick={() => setIsStudentModalOpen(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition font-medium">Cancelar</button>
-                                <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">{editingStudent ? "Guardar" : "Agregar"}</button>
-                            </div>
-                        </form>
+                        ) : (
+                            <form onSubmit={handleStudentSubmit} className="p-6">
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre(s)</label>
+                                        <input
+                                            value={studentFormData.Nombre_Discente}
+                                            onChange={(e) => setStudentFormData({...studentFormData, Nombre_Discente: e.target.value})}
+                                            className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Paterno</label>
+                                        <input
+                                            value={studentFormData.Apellido_Paterno_Discente}
+                                            onChange={(e) => setStudentFormData({...studentFormData, Apellido_Paterno_Discente: e.target.value})}
+                                            className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido Materno</label>
+                                        <input
+                                            value={studentFormData.Apellido_Materno_Discente}
+                                            onChange={(e) => setStudentFormData({...studentFormData, Apellido_Materno_Discente: e.target.value})}
+                                            className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-white"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
+                                    <button type="button" onClick={() => setIsStudentModalOpen(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition font-medium">Cancelar</button>
+                                    <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">{editingStudent ? "Guardar" : "Agregar"}</button>
+                                </div>
+                            </form>
+                        )}
                     </div>
                 </div>
             )}
@@ -663,12 +799,20 @@ export default function Dashboard() {
                                         <div className="flex flex-col sm:flex-row gap-4">
                                             <button
                                                 onClick={() => setGameConfig({...gameConfig, element: 'tierra', operation: 'suma'})}
-                                                className={`flex-1 py-3 rounded-lg border-2 font-bold transition-colors ${gameConfig.element === 'tierra' ? 'border-orange-500 bg-orange-50 text-orange-800' : 'border-gray-200 text-gray-500 hover:border-orange-200'}`}
-                                            >Tierra (+, -)</button>
+                                                style={{ backgroundImage: "url('/assets/bg_tierra.jpg')" }}
+                                                className={`relative flex-1 py-8 rounded-lg border-2 font-bold bg-cover bg-center overflow-hidden transition-all ${gameConfig.element === 'tierra' ? 'border-orange-500 ring-2 ring-orange-400' : 'border-gray-200 hover:border-orange-300'}`}
+                                            >
+                                                <span className={`absolute inset-0 transition-colors ${gameConfig.element === 'tierra' ? 'bg-orange-900/30' : 'bg-black/40 hover:bg-black/25'}`} />
+                                                <span className="relative z-10 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">Tierra (+, -)</span>
+                                            </button>
                                             <button
                                                 onClick={() => setGameConfig({...gameConfig, element: 'agua', operation: 'multiplicacion', numCifras: 2, cifras: ['', '']})}
-                                                className={`flex-1 py-3 rounded-lg border-2 font-bold transition-colors ${gameConfig.element === 'agua' ? 'border-cyan-500 bg-cyan-50 text-cyan-800' : 'border-gray-200 text-gray-500 hover:border-cyan-200'}`}
-                                            >Agua (x, ÷)</button>
+                                                style={{ backgroundImage: "url('/assets/bg_agua.png')" }}
+                                                className={`relative flex-1 py-8 rounded-lg border-2 font-bold bg-cover bg-center overflow-hidden transition-all ${gameConfig.element === 'agua' ? 'border-cyan-500 ring-2 ring-cyan-400' : 'border-gray-200 hover:border-cyan-300'}`}
+                                            >
+                                                <span className={`absolute inset-0 transition-colors ${gameConfig.element === 'agua' ? 'bg-cyan-900/30' : 'bg-black/40 hover:bg-black/25'}`} />
+                                                <span className="relative z-10 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">Agua (x, ÷)</span>
+                                            </button>
                                         </div>
                                     </div>
 
@@ -871,7 +1015,7 @@ export default function Dashboard() {
                         <>
                             ¿Estás seguro de que deseas eliminar el grupo{" "}
                             <span className="font-semibold">
-                                {groupToDelete.Grado}° - {groupToDelete.Nombre_Grupo}
+                                {groupToDelete.Grado}° - {groupToDelete.Nombre_Grupo} ({groupToDelete.Año})
                             </span>
                             ? Se perderá el acceso a sus alumnos. Esta acción no se puede deshacer.
                         </>
