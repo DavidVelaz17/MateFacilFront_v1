@@ -4,8 +4,10 @@ import { LevelsTierra, LevelsAgua } from "@/game/scenes/LevelsData";
 import { audioManager } from "@/game/scenes/audioManager";
 
 export class MapScene extends Phaser.Scene {
-    private static currentLevelPointTierra: number = 0; // Puntos: 0, 1, 2, 3
-    private static currentLevelPointAgua: number = 0;
+    // Publicas: PhaserGame.tsx las siembra en cada montaje con el valor
+    // guardado en el backend (discente.NivelMapaTierra/NivelMapaAgua).
+    static currentLevelPointTierra: number = 0; // Puntos: 0, 1, 2, 3
+    static currentLevelPointAgua: number = 0;
     private levelData: any;
     private currentElement: 'tierra' | 'agua' = 'tierra';
     private playerNode: Phaser.GameObjects.Arc | null = null;
@@ -25,11 +27,14 @@ export class MapScene extends Phaser.Scene {
         this.justWon = data && data.win ? true : false;
         this.totalStars = this.registry.get('totalStars') || 0;
 
-        // Conservamos la dificultad si viene heredada desde GameScene, si no, inicia en Normal (2)
+        // Conservamos la dificultad si viene heredada desde GameScene (avance
+        // dentro de la misma sesion); si no, retomamos la del ultimo intento
+        // guardado (ver PhaserGame.tsx -> registry 'lastDificultad'), y solo
+        // si tampoco hay eso, Normal (2).
         if (data && data.dificultad !== undefined) {
             this.levelData.dificultad = data.dificultad;
         } else if (!this.levelData.dificultad) {
-            this.levelData.dificultad = 2; // Default a Normal
+            this.levelData.dificultad = this.registry.get('lastDificultad') || 2;
         }
     }
 
@@ -78,6 +83,7 @@ export class MapScene extends Phaser.Scene {
                 // CONDICIÓN: Si presiona REINICIAR, reseteamos el progreso del mundo a 0
                 if (this.currentElement === 'tierra') MapScene.currentLevelPointTierra = 0;
                 else MapScene.currentLevelPointAgua = 0;
+                this.emitMapProgress();
 
                 this.scene.restart({ config: this.levelData, totalStars: this.totalStars });
             } else {
@@ -160,6 +166,7 @@ export class MapScene extends Phaser.Scene {
             } else {
                 MapScene.currentLevelPointAgua++;
             }
+            this.emitMapProgress();
 
             const nextPointIndex = currentPointIndex + 1;
             const nextPoint = pointData[nextPointIndex];
@@ -179,7 +186,18 @@ export class MapScene extends Phaser.Scene {
             } else {
                 MapScene.currentLevelPointAgua++;
             }
+            this.emitMapProgress();
             this.scene.restart({ config: this.levelData });
         }
+    }
+
+    // Notifica a la capa de React (PlayPage) el nuevo nivel alcanzado en
+    // este mundo, para que lo guarde en el backend (discente.NivelMapaTierra
+    // / NivelMapaAgua) y el mapa retome ahi la proxima vez que se cargue.
+    private emitMapProgress() {
+        const nivel = this.currentElement === 'tierra'
+            ? MapScene.currentLevelPointTierra
+            : MapScene.currentLevelPointAgua;
+        EventBus.emit('mapProgress', { element: this.currentElement, nivel });
     }
 }

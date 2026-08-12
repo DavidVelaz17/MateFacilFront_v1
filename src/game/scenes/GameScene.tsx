@@ -9,6 +9,26 @@ import {audioManager} from "@/game/scenes/audioManager";
 import { generateProblema } from './exerciseGenerator';
 import type { DificultadNum, ProblemaMatematico } from './LevelsData';
 
+// Un evento por cada numero recogido durante la partida (correcto o
+// trampa), en el orden en que el alumno lo recogio.
+interface DesgloseEvento {
+    orden: number;
+    valor: number;
+    tipo: 'objetivo' | 'trampa';
+    correcta: boolean;
+    tiempo: number;
+}
+
+// Un sub-intento por cada vez que el alumno choco con la puerta: una vida
+// perdida genera un sub-intento fallido y reinicia el mismo problema; el
+// ultimo sub-intento puede ser exitoso o, si se quedo sin vidas, fallido.
+interface SubIntentoDesglose {
+    numero: number;
+    exitoso: boolean;
+    vidasRestantes: number;
+    eventos: DesgloseEvento[];
+}
+
 export class GameScene extends Phaser.Scene {
     private player!: Phaser.Physics.Arcade.Sprite;
     private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -38,6 +58,12 @@ export class GameScene extends Phaser.Scene {
 
     private gameState = {
         collectedNumbers: [] as number[],
+        desglose: [] as DesgloseEvento[],
+        // Sub-intentos fallidos de esta misma partida (se recibe y se
+        // reenvia a traves de scene.restart para sobrevivir a los
+        // reintentos con vidas restantes; se reinicia solo en una partida
+        // realmente nueva).
+        historialIntentos: [] as SubIntentoDesglose[],
         elapsedTime: 0,
         lastEmittedTime: 0,
         doorFailed: false,
@@ -52,7 +78,8 @@ export class GameScene extends Phaser.Scene {
 
     init(data: any) {
         const startingLives = data && data.lives !== undefined ? data.lives : 3;
-        this.gameState = { collectedNumbers: [], elapsedTime: 0, lastEmittedTime: 0, doorFailed: false,
+        this.gameState = { collectedNumbers: [], desglose: [], historialIntentos: data?.historialIntentos ?? [],
+            elapsedTime: 0, lastEmittedTime: 0, doorFailed: false,
             isGameOver: false, isPaused: false, lives: startingLives };
         console.log("4. GameScene inicializado con:", data);
         this.totalStarsHistorical = this.registry.get('totalStars') || 0;
@@ -270,6 +297,14 @@ export class GameScene extends Phaser.Scene {
                 ? this.levelConfig.targetNumbers[collectedIndex] === numItem.itemValue
                 : this.levelConfig.targetNumbers.includes(numItem.itemValue);
 
+            this.gameState.desglose.push({
+                orden: collectedIndex + 1,
+                valor: numItem.itemValue,
+                tipo: this.levelConfig.trapNumbers.includes(numItem.itemValue) && !isCorrectNumber ? 'trampa' : 'objetivo',
+                correcta: isCorrectNumber,
+                tiempo: Math.floor(this.gameState.elapsedTime)
+            });
+
             if (!isCorrectNumber) {
                 this.emotionState.transitionTo(new SadState());
                 this.gameState.doorFailed = true;
@@ -324,6 +359,18 @@ export class GameScene extends Phaser.Scene {
                 }
                 this.physics.pause();
 
+                // Este sub-intento fallo: lo guardamos en el historial para
+                // que sobreviva al reinicio de la escena (mismo problema).
+                const historialActualizado: SubIntentoDesglose[] = [
+                    ...this.gameState.historialIntentos,
+                    {
+                        numero: this.gameState.historialIntentos.length + 1,
+                        exitoso: false,
+                        vidasRestantes: this.gameState.lives,
+                        eventos: this.gameState.desglose
+                    }
+                ];
+
                 this.add.text(this.scale.width / 2, this.scale.height / 2, 'Vuelve a intentarlo', {
                     fontSize: '40px', color: '#ff0', stroke: '#000', strokeThickness: 6
                 }).setOrigin(0.5);
@@ -334,7 +381,7 @@ export class GameScene extends Phaser.Scene {
                 btn.on('pointerover', () => btn.setTexture('btn_volver_a_jugar_1'));
                 btn.on('pointerout', () => btn.setTexture('btn_volver_a_jugar_0'));
                 btn.on('pointerdown', () => {
-                    this.scene.restart({ config: this.levelData, lives: this.gameState.lives, dificultad: this.currentDifficulty, totalStars: this.totalStarsHistorical, problema: this.currentProblema });
+                    this.scene.restart({ config: this.levelData, lives: this.gameState.lives, dificultad: this.currentDifficulty, totalStars: this.totalStarsHistorical, problema: this.currentProblema, historialIntentos: historialActualizado });
                 });
             } else {
                 this.triggerLoss('TE QUEDASTE SIN VIDAS');
@@ -371,7 +418,9 @@ export class GameScene extends Phaser.Scene {
             Puntos: (estrellasObtenidas * 20) + this.getTiempoBonus(tiempoFinal),
             Emocion: estrellasObtenidas === 3 ? 3 : 2,
             Monedas: estrellasObtenidas,
-            Operacion: this.levelData.operation
+            Operacion: this.levelData.operation,
+            Vidas: this.gameState.lives,
+            Desglose: this.buildDesglose(true)
         };
         EventBus.emit('gameOverStats', stats);
 
@@ -429,7 +478,9 @@ export class GameScene extends Phaser.Scene {
             Puntos: 0,
             Emocion: 1,
             Monedas: 0,
-            Operacion: this.levelData.operation
+            Operacion: this.levelData.operation,
+            Vidas: this.gameState.lives,
+            Desglose: this.buildDesglose(false)
         };
         EventBus.emit('gameOverStats', stats);
 
@@ -445,6 +496,22 @@ export class GameScene extends Phaser.Scene {
         btn.on('pointerdown', () => {
             this.scene.restart({ config: this.levelData, lives: 3, dificultad: loweredDifficulty,totalStars: this.totalStarsHistorical });
         });
+    }
+
+    private buildDesglose(exitoso: boolean) {
+        const intentoFinal: SubIntentoDesglose = {
+            numero: this.gameState.historialIntentos.length + 1,
+            exitoso,
+            vidasRestantes: this.gameState.lives,
+            eventos: this.gameState.desglose
+        };
+
+        return {
+            objetivo: this.levelConfig.targetNumbers,
+            trampas: this.levelConfig.trapNumbers,
+            resultado: this.levelConfig.solution,
+            intentos: [...this.gameState.historialIntentos, intentoFinal]
+        };
     }
 
     private getTiempoBonus(tiempoSegundos: number): number {

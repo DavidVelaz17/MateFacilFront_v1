@@ -4,7 +4,38 @@ import { useState, useEffect } from "react";
 import api from "@/config/api";
 import { useToast } from "@/components/ToastProvider";
 
-import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, Loader2, ListChecks, X, Check, Heart, Star, TrendingUp } from "lucide-react";
+import {
+    ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
+} from "recharts";
+
+interface DesgloseEvento {
+    orden: number;
+    valor: number;
+    tipo: 'objetivo' | 'trampa';
+    correcta: boolean;
+    tiempo: number;
+}
+
+// Un sub-intento por cada vez que el alumno choco con la puerta (una vida
+// perdida genera un sub-intento fallido, mas el final exitoso o no).
+interface DesgloseIntento {
+    numero: number;
+    exitoso: boolean;
+    vidasRestantes: number;
+    eventos: DesgloseEvento[];
+}
+
+interface Desglose {
+    objetivo: number[];
+    trampas: number[];
+    resultado: number;
+    // Formato nuevo: multiples sub-intentos.
+    intentos?: DesgloseIntento[];
+    // Formato viejo (partidas registradas antes de este cambio): un solo
+    // arreglo plano de eventos, sin distinguir sub-intentos.
+    eventos?: DesgloseEvento[];
+}
 
 export default function StatsPage() {
     const router = useRouter();
@@ -12,6 +43,7 @@ export default function StatsPage() {
     const { showToast } = useToast();
 
     const [stats, setStats] = useState({
+        studentName: "",
         avgTime: "0s",
         attempts: 0,
         topEmotion: "Desconocido",
@@ -21,6 +53,8 @@ export default function StatsPage() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
+    const [selectedSession, setSelectedSession] = useState<any | null>(null);
+    const [showProgressModal, setShowProgressModal] = useState(false);
     const itemsPerPage = 10;
 
     useEffect(() => {
@@ -47,6 +81,7 @@ export default function StatsPage() {
                 };
 
                 setStats({
+                    studentName: data.studentName || "",
                     avgTime: timeString,
                     attempts: data.attempts,
                     topEmotion: emocionesMap[data.topEmotion] || "Feliz",
@@ -63,11 +98,18 @@ export default function StatsPage() {
                         });
                         const sessionDifficultyNum = session.Dificultad || session.dificultad || 2;
                         return {
+                            id: session.id,
                             date: formattedDate,
+                            fechaRaw: dateObj,
                             score: session.score,
+                            dificultadNum: sessionDifficultyNum,
                             emotion: emocionesMap[session.emotion] || "Feliz",
                             difficulty: dificultadMap[sessionDifficultyNum] || "Normal",
-                            operation: operacionMap[session.operacion] || "Sin registrar"
+                            operation: operacionMap[session.operacion] || "Sin registrar",
+                            operationKey: session.operacion as string,
+                            desglose: (session.desglose || null) as Desglose | null,
+                            vidas: session.vidas as number | null,
+                            estrellas: session.estrellas as number
                         };
                     })
                 });
@@ -137,6 +179,76 @@ export default function StatsPage() {
         );
     };
 
+    const getOperationSymbol = (operationKey: string) => {
+        const symbolMap: Record<string, string> = {
+            suma: "+",
+            resta: "-",
+            multiplicacion: "x",
+            division: "÷"
+        };
+        return symbolMap[operationKey] || "+";
+    };
+
+    const renderEventosTable = (eventos: DesgloseEvento[]) => (
+        <table className="min-w-full text-left text-sm">
+            <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
+            <tr>
+                <th className="px-3 py-2">Orden</th>
+                <th className="px-3 py-2">Número</th>
+                <th className="px-3 py-2">Tipo</th>
+                <th className="px-3 py-2">Resultado</th>
+                <th className="px-3 py-2">Tiempo</th>
+            </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+            {eventos.map((evento) => (
+                <tr key={evento.orden}>
+                    <td className="px-3 py-2 font-medium">{evento.orden}</td>
+                    <td className="px-3 py-2 font-mono">{evento.valor}</td>
+                    <td className="px-3 py-2">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${evento.tipo === 'trampa' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {evento.tipo}
+                        </span>
+                    </td>
+                    <td className="px-3 py-2">
+                        {evento.correcta ? (
+                            <span className="inline-flex items-center gap-1 text-green-600 font-semibold">
+                                <Check size={14} /> Correcto
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1 text-red-600 font-semibold">
+                                <X size={14} /> Incorrecto
+                            </span>
+                        )}
+                    </td>
+                    <td className="px-3 py-2 text-gray-500">{evento.tiempo}s</td>
+                </tr>
+            ))}
+            {eventos.length === 0 && (
+                <tr>
+                    <td colSpan={5} className="px-3 py-4 text-center text-gray-400">
+                        El alumno no recogió ningún número en este intento.
+                    </td>
+                </tr>
+            )}
+            </tbody>
+        </table>
+    );
+
+    // --- DATOS PARA LA GRÁFICA DE AVANCE (orden cronológico ascendente) ---
+    // Cada punto es un intento real (a diferencia de la gráfica del grupo,
+    // que sí agrupa por día): incluimos la hora para que dos intentos del
+    // mismo día no compartan la misma etiqueta en el eje X.
+    const progressChartData = [...stats.recentSessions]
+        .sort((a, b) => a.fechaRaw.getTime() - b.fechaRaw.getTime())
+        .map((session) => ({
+            fecha: session.fechaRaw.toLocaleString('es-MX', {
+                day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
+            }),
+            puntos: session.score,
+            dificultad: session.dificultadNum
+        }));
+
     // --- LÓGICA DE PAGINACIÓN ---
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -158,9 +270,20 @@ export default function StatsPage() {
             </button>
 
             <div className="max-w-5xl mx-auto">
-                <header className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900">Reporte de Desempeño</h1>
-                    <p className="text-gray-500">Alumno ID: <span className="font-mono text-gray-700 font-bold">#{params.id}</span></p>
+                <header className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900">Reporte de Desempeño</h1>
+                        <p className="text-gray-500">
+                            Alumno: <span className="text-gray-700 font-bold">{stats.studentName || `#${params.id}`}</span>
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => setShowProgressModal(true)}
+                        disabled={stats.recentSessions.length === 0}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
+                    >
+                        <TrendingUp size={18} /> Ver avance
+                    </button>
                 </header>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -231,7 +354,9 @@ export default function StatsPage() {
                                 <th className="px-6 py-3 whitespace-nowrap">Operación</th>
                                 <th className="px-6 py-3 whitespace-nowrap">Dificultad</th>
                                 <th className="px-6 py-3 whitespace-nowrap">Puntaje</th>
+                                <th className="px-6 py-3 whitespace-nowrap">Estrellas</th>
                                 <th className="px-6 py-3 whitespace-nowrap">Emoción Final</th>
+                                <th className="px-6 py-3 whitespace-nowrap text-center">Detalle</th>
                             </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 text-gray-700">
@@ -247,9 +372,23 @@ export default function StatsPage() {
                                     </td>
                                     <td className="px-6 py-3 font-medium">{session.score} / 100</td>
                                     <td className="px-6 py-3">
+                                        <span className="inline-flex items-center gap-1 text-yellow-500 font-semibold">
+                                            <Star size={14} className="fill-current" /> {session.estrellas}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-3">
                                         <span className={`px-2 py-1 rounded text-xs font-bold ${getEmotionColor(session.emotion)}`}>
                                             {session.emotion}
                                         </span>
+                                    </td>
+                                    <td className="px-6 py-3 text-center">
+                                        <button
+                                            onClick={() => setSelectedSession(session)}
+                                            title="Ver desglose de la partida"
+                                            className="inline-flex items-center justify-center p-2 rounded-lg text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors"
+                                        >
+                                            <ListChecks size={18} />
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -292,6 +431,140 @@ export default function StatsPage() {
                     )}
                 </div>
             </div>
+
+            {selectedSession && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+                    onClick={() => setSelectedSession(null)}
+                >
+                    <div
+                        className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                <ListChecks size={18} /> Desglose de la partida
+                            </h3>
+                            <button
+                                onClick={() => setSelectedSession(null)}
+                                className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            <div className="flex flex-wrap gap-2 mb-4">
+                                {getOperationBadge(selectedSession.operation)}
+                                {getDifficultyBadge(selectedSession.difficulty)}
+                                <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-gray-100 text-gray-600">
+                                    {selectedSession.date}
+                                </span>
+                                {(selectedSession.vidas !== null && selectedSession.vidas !== undefined) && (
+                                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-red-50 text-red-600">
+                                        <Heart size={12} className="fill-current" /> {selectedSession.vidas} {selectedSession.vidas === 1 ? 'vida' : 'vidas'}
+                                    </span>
+                                )}
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-yellow-50 text-yellow-600">
+                                    <Star size={12} className="fill-current" /> {selectedSession.estrellas} {selectedSession.estrellas === 1 ? 'estrella' : 'estrellas'}
+                                </span>
+                            </div>
+
+                            {!selectedSession.desglose ? (
+                                <p className="text-gray-500 text-sm">
+                                    Esta partida no tiene desglose disponible (fue registrada antes de esta función).
+                                </p>
+                            ) : (
+                                <>
+                                    <div className="mb-5 bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                                        <p className="text-xs uppercase font-semibold text-gray-500 mb-2">Ecuación objetivo</p>
+                                        <p className="text-lg font-mono font-bold text-gray-800">
+                                            {selectedSession.desglose.objetivo.join(` ${getOperationSymbol(selectedSession.operationKey)} `)}
+                                            {' = '}
+                                            {selectedSession.desglose.resultado}
+                                        </p>
+                                    </div>
+
+                                    {selectedSession.desglose.intentos ? (
+                                        <div className="space-y-5">
+                                            {selectedSession.desglose.intentos.map((intento: DesgloseIntento) => (
+                                                <div key={intento.numero}>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <p className="text-sm font-bold text-gray-700">
+                                                            Intento {intento.numero}
+                                                        </p>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                                                                <Heart size={12} className="fill-current text-red-400" /> {intento.vidasRestantes}
+                                                            </span>
+                                                            {intento.exitoso ? (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold uppercase bg-green-100 text-green-700">
+                                                                    <Check size={12} /> Exitoso
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold uppercase bg-red-100 text-red-700">
+                                                                    <X size={12} /> Fallido
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {renderEventosTable(intento.eventos)}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        renderEventosTable(selectedSession.desglose.eventos || [])
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showProgressModal && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+                    onClick={() => setShowProgressModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                <TrendingUp size={18} /> Avance del alumno
+                            </h3>
+                            <button
+                                onClick={() => setShowProgressModal(false)}
+                                className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            <p className="text-sm text-gray-500 mb-4">
+                                Puntaje (0-100) y dificultad (1-3, 4=personalizado) por partida, en orden cronológico.
+                            </p>
+                            <div className="w-full h-96">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={progressChartData} margin={{ top: 5, right: 10, left: -10, bottom: 25 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                        <XAxis dataKey="fecha" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" height={50} interval="preserveStartEnd" />
+                                        <YAxis yAxisId="puntos" domain={[0, 100]} tick={{ fontSize: 12 }} />
+                                        <YAxis yAxisId="dificultad" orientation="right" domain={[0, 4]} allowDecimals={false} tick={{ fontSize: 12 }} />
+                                        <Tooltip />
+                                        <Legend />
+                                        <Line yAxisId="puntos" type="monotone" dataKey="puntos" name="Puntaje" stroke="#7c3aed" strokeWidth={2} dot={{ r: 3 }} />
+                                        <Line yAxisId="dificultad" type="monotone" dataKey="dificultad" name="Dificultad" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
