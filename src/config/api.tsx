@@ -1,7 +1,23 @@
 import axios from "axios";
 
+// NEXT_PUBLIC_API_URL (si esta definido) se incrusta en el bundle en build
+// time y siempre gana: sirve para forzar un backend fijo (ej. produccion
+// con dominio/HTTPS). Si no esta definido, resolvemos el backend en tiempo
+// de ejecucion usando el mismo host con el que el navegador ya cargo el
+// frontend (window.location.hostname). Asi funciona sin reconstruir sin
+// importar la red/IP LAN desde la que se acceda.
+const resolveBaseURL = (): string | undefined => {
+    if (process.env.NEXT_PUBLIC_API_URL) {
+        return process.env.NEXT_PUBLIC_API_URL;
+    }
+    if (typeof window !== "undefined") {
+        return `http://${window.location.hostname}:3001`;
+    }
+    return undefined;
+};
+
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL,
+    baseURL: resolveBaseURL(),
     timeout: 10000,
     headers: {
         "Content-Type": "application/json",

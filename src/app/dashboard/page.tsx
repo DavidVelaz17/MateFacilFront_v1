@@ -3,8 +3,12 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import {
     Edit, Trash2, Play, BarChart2, Plus, X,
-    Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut, Menu, Loader2, Search, Star
+    Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut, Menu, Loader2, Search, Star, TrendingUp
 } from "lucide-react";
+import {
+    ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+    ScatterChart, Scatter, ReferenceLine
+} from "recharts";
 import IconButton from "../components/IconButton";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { useRouter } from "next/navigation";
@@ -30,6 +34,21 @@ interface Student {
     totalStars?: number;
 }
 
+// Posicion acumulada de un alumno: puntaje promedio x dificultad promedio
+// historicos (no una serie en el tiempo, es su "estado actual").
+interface GroupStudentSummary {
+    id_discente: number;
+    nombre: string;
+    attempts: number;
+    avgPuntos: number;
+    avgDificultad: number;
+}
+
+interface GroupStats {
+    groupAverages: { fecha: string; avgPuntos: number; avgDificultad: number | null }[];
+    perStudent: GroupStudentSummary[];
+}
+
 interface GameConfig {
     mode: 'historia' | 'custom' | null;
     type: 'prueba' | 'repaso' | null;
@@ -50,6 +69,22 @@ function normalizeSearchText(value: string): string {
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase();
+}
+
+// Tooltip del gráfico de desempeño por alumno: sin leyenda ni colores por
+// identidad, la única forma de saber a quién pertenece un punto es al
+// pasar el cursor sobre él.
+function StudentScatterTooltip({ active, payload }: any) {
+    if (!active || !payload || !payload.length) return null;
+    const data: GroupStudentSummary = payload[0].payload;
+    return (
+        <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-sm">
+            <p className="font-semibold text-gray-800">{data.nombre}</p>
+            <p className="text-gray-600">Puntaje promedio: <span className="font-medium">{data.avgPuntos}</span></p>
+            <p className="text-gray-600">Dificultad promedio: <span className="font-medium">{data.avgDificultad}</span></p>
+            <p className="text-gray-500 text-xs mt-1">{data.attempts} {data.attempts === 1 ? 'partida' : 'partidas'}</p>
+        </div>
+    );
 }
 
 export default function Dashboard() {
@@ -96,6 +131,11 @@ export default function Dashboard() {
     const [groups, setGroups] = useState<Group[]>([]);
     const [isGroupsSidebarOpen, setIsGroupsSidebarOpen] = useState(true);
     const [activeGroupId, setActiveGroupId] = useState<number | null>(null);
+
+    // --- ESTADOS DE AVANCE DEL GRUPO ---
+    const [showGroupProgressModal, setShowGroupProgressModal] = useState(false);
+    const [groupStats, setGroupStats] = useState<GroupStats | null>(null);
+    const [isLoadingGroupStats, setIsLoadingGroupStats] = useState(false);
 
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
     const [editingGroup, setEditingGroup] = useState<Group | null>(null);
@@ -267,20 +307,49 @@ export default function Dashboard() {
     };
 
     const confirmDeleteStudent = async () => {
-        if (!studentToDelete) return;
+        if (!studentToDelete || !activeGroupId) return;
         setIsDeletingStudent(true);
         try {
-            await api.delete(`/discentes/${studentToDelete.id_discente}`);
+            // Dentro de un grupo solo se desasigna al alumno, nunca se le
+            // elimina del sistema: eso solo lo puede hacer un administrador
+            // desde el panel de administración.
+            await api.delete(`/discentes/${studentToDelete.id_discente}/groups/${activeGroupId}`);
             setStudentToDelete(null);
-            showToast("Alumno eliminado.", "success");
+            showToast("Alumno removido del grupo.", "success");
             fetchStudents();
         } catch (error) {
-            console.error("Error al eliminar alumno", error);
-            showToast("Hubo un error al eliminar el alumno.", "error");
+            console.error("Error al remover alumno del grupo", error);
+            showToast("Hubo un error al remover al alumno del grupo.", "error");
         } finally {
             setIsDeletingStudent(false);
         }
     };
+
+    // --- AVANCE DEL GRUPO ---
+    const handleOpenGroupProgress = async () => {
+        if (!activeGroupId) return;
+        setShowGroupProgressModal(true);
+        setIsLoadingGroupStats(true);
+        try {
+            const res = await api.get(`/groups/${activeGroupId}/stats`);
+            setGroupStats(res.data);
+        } catch (error) {
+            console.error("Error al cargar el avance del grupo", error);
+            showToast("No se pudo cargar el avance del grupo.", "error");
+        } finally {
+            setIsLoadingGroupStats(false);
+        }
+    };
+
+    const formatShortDate = (isoDate: string) =>
+        new Date(isoDate).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: '2-digit' });
+
+    // Une los promedios diarios del grupo con el formato que espera la grafica.
+    const groupAveragesChartData = (groupStats?.groupAverages || []).map((point) => ({
+        fecha: formatShortDate(point.fecha),
+        puntos: point.avgPuntos,
+        dificultad: point.avgDificultad
+    }));
 
     // --- MANEJADORES DE GRUPOS (CRUD COMPLETO CON BACKEND) ---
     const handleOpenAddGroup = (e: React.MouseEvent) => {
@@ -471,12 +540,20 @@ export default function Dashboard() {
                             </div>
                         </div>
                         {activeGroupId && (
-                            <button
-                                onClick={handleOpenAddStudent}
-                                className="flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition shadow-lg font-medium shrink-0"
-                            >
-                                <Plus size={20} /> Agregar Alumno
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={handleOpenGroupProgress}
+                                    className="flex items-center justify-center gap-2 bg-white text-purple-700 border border-purple-200 px-5 py-2.5 rounded-lg hover:bg-purple-50 transition font-medium shrink-0"
+                                >
+                                    <TrendingUp size={20} /> Ver avance del grupo
+                                </button>
+                                <button
+                                    onClick={handleOpenAddStudent}
+                                    className="flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition shadow-lg font-medium shrink-0"
+                                >
+                                    <Plus size={20} /> Agregar Alumno
+                                </button>
+                            </div>
                         )}
                     </header>
 
@@ -513,7 +590,7 @@ export default function Dashboard() {
                                             <td className="py-4 px-6 text-center">
                                                 <div className="flex item-center justify-center gap-3">
                                                     <IconButton icon={<Edit size={18} />} label="Modificar" onClick={() => handleOpenEditStudent(student)} color="text-blue-500" />
-                                                    <IconButton icon={<Trash2 size={18} />} label="Eliminar" onClick={() => handleDeleteStudent(student)} color="text-red-500" />
+                                                    <IconButton icon={<Trash2 size={18} />} label="Quitar del grupo" onClick={() => handleDeleteStudent(student)} color="text-red-500" />
                                                     <IconButton
                                                         icon={<Play size={18} />}
                                                         label="Jugar"
@@ -988,17 +1065,19 @@ export default function Dashboard() {
             {/* ================= MODAL DE CONFIRMACIÓN DE BORRADO DE ALUMNO ================= */}
             {studentToDelete && (
                 <ConfirmDeleteModal
-                    title="Eliminar Alumno"
+                    title="Quitar del grupo"
                     isDeleting={isDeletingStudent}
                     onConfirm={confirmDeleteStudent}
                     onCancel={() => setStudentToDelete(null)}
                     message={
                         <>
-                            ¿Estás seguro de que deseas eliminar a{" "}
+                            ¿Estás seguro de que deseas quitar a{" "}
                             <span className="font-semibold">
                                 {studentToDelete.Nombre_Discente} {studentToDelete.Apellido_Paterno_Discente}
                             </span>{" "}
-                            del sistema? Esta acción no se puede deshacer.
+                            de este grupo? El alumno seguirá existiendo en el sistema y podrás
+                            volver a agregarlo después. Para eliminarlo por completo, contacta
+                            a un administrador.
                         </>
                     }
                 />
@@ -1021,6 +1100,99 @@ export default function Dashboard() {
                         </>
                     }
                 />
+            )}
+
+            {/* ================= MODAL DE AVANCE DEL GRUPO ================= */}
+            {showGroupProgressModal && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+                    onClick={() => setShowGroupProgressModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-y-auto text-black"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                <TrendingUp size={18} /> Avance del grupo
+                            </h3>
+                            <button
+                                onClick={() => setShowGroupProgressModal(false)}
+                                className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            {isLoadingGroupStats ? (
+                                <div className="py-16 flex justify-center text-gray-400">
+                                    <Loader2 size={24} className="animate-spin" />
+                                </div>
+                            ) : groupAveragesChartData.length === 0 ? (
+                                <p className="text-gray-500 text-sm text-center py-10">
+                                    Este grupo todavía no tiene partidas registradas.
+                                </p>
+                            ) : (
+                                <>
+                                    <div className="mb-8">
+                                        <h4 className="font-semibold text-gray-700 mb-1">Promedio del grupo por día</h4>
+                                        <p className="text-sm text-gray-500 mb-4">
+                                            Puntaje promedio (0-100) y dificultad promedio (1-3) de todos los alumnos
+                                            del grupo. Las partidas en modo personalizado no se cuentan en la
+                                            dificultad promedio, ya que no forman parte de esa escala.
+                                        </p>
+                                        <div className="w-full h-72">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <LineChart data={groupAveragesChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                                    <XAxis dataKey="fecha" tick={{ fontSize: 12 }} />
+                                                    <YAxis yAxisId="puntos" domain={[0, 100]} tick={{ fontSize: 12 }} />
+                                                    <YAxis yAxisId="dificultad" orientation="right" domain={[0, 4]} allowDecimals={false} tick={{ fontSize: 12 }} />
+                                                    <Tooltip />
+                                                    <Legend />
+                                                    <Line yAxisId="puntos" type="monotone" dataKey="puntos" name="Puntaje promedio" stroke="#7c3aed" strokeWidth={2} dot={{ r: 3 }} />
+                                                    <Line yAxisId="dificultad" type="monotone" dataKey="dificultad" name="Dificultad promedio" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h4 className="font-semibold text-gray-700 mb-1">Desempeño actual por alumno</h4>
+                                        <p className="text-sm text-gray-500 mb-4">
+                                            Un punto por alumno, ubicado por su puntaje y dificultad promedio
+                                            acumulados: entre más abajo a la izquierda, más apoyo necesita; entre
+                                            más arriba a la derecha, mejor le va. Pasa el cursor sobre un punto
+                                            para ver de quién se trata.
+                                        </p>
+                                        <div className="w-full h-80">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <ScatterChart margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                                    <XAxis
+                                                        type="number" dataKey="avgPuntos" name="Puntaje promedio"
+                                                        domain={[0, 100]} tick={{ fontSize: 12 }}
+                                                        label={{ value: 'Puntaje promedio', position: 'insideBottom', offset: -5, fontSize: 12, fill: '#6b7280' }}
+                                                    />
+                                                    <YAxis
+                                                        type="number" dataKey="avgDificultad" name="Dificultad promedio"
+                                                        domain={[0.5, 3.5]} tick={{ fontSize: 12 }}
+                                                        label={{ value: 'Dificultad promedio', angle: -90, position: 'insideLeft', fontSize: 12, fill: '#6b7280' }}
+                                                    />
+                                                    <ReferenceLine x={50} stroke="#d1d5db" strokeDasharray="4 4" />
+                                                    <ReferenceLine y={2} stroke="#d1d5db" strokeDasharray="4 4" />
+                                                    <Tooltip content={<StudentScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+                                                    <Scatter data={groupStats?.perStudent || []} fill="#7c3aed" />
+                                                </ScatterChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

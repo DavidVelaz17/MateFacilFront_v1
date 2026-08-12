@@ -43,6 +43,14 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                 transparent: true
             };
 
+            // MapScene guarda el progreso del mapa en variables estaticas de
+            // la clase (sobreviven a que se destruya/cree el Phaser.Game),
+            // asi que hay que sembrarlas explicitamente en cada montaje para
+            // que el backend sea siempre la fuente de verdad, no lo que haya
+            // quedado en memoria de una sesion anterior en la misma pestaña.
+            MapScene.currentLevelPointTierra = levelData?.nivelMapaTierra || 0;
+            MapScene.currentLevelPointAgua = levelData?.nivelMapaAgua || 0;
+
             if (!gameRef.current) {
                 gameRef.current = new Phaser.Game(config);
                 gameRef.current.scene.add('PreloadScene', PreloadScene);
@@ -56,6 +64,7 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                     if (gameRef.current) {
                         console.log("React: Arrancando motor con datos ->", levelData);
                         gameRef.current.registry.set('totalStars', levelData.totalStars || 0);
+                        gameRef.current.registry.set('lastDificultad', levelData.dificultad || 2);
                         gameRef.current.scene.start('PreloadScene', { config: levelData });
                     }
                 }, 100);
@@ -63,6 +72,7 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
             else if (levelData) {
                 console.log("React: Reiniciando motor por nuevos datos ->", levelData);
                 gameRef.current.registry.set('totalStars', levelData.totalStars || 0);
+                gameRef.current.registry.set('lastDificultad', levelData.dificultad || 2);
                 const sceneManager = gameRef.current.scene;
                 sceneManager.getScenes(true).forEach(scene => scene.scene.stop());
                 sceneManager.start('PreloadScene', { config: levelData });

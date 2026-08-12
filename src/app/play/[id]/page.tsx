@@ -25,7 +25,10 @@ export default function PlayPage() {
             const initialPhaserData = {
                 mode: mode,
                 config: null as any,
-                totalStars: 0
+                totalStars: 0,
+                dificultad: 2,
+                nivelMapaTierra: 0,
+                nivelMapaAgua: 0
             };
 
             if (mode === 'custom' && configString) {
@@ -40,6 +43,23 @@ export default function PlayPage() {
 
                     initialPhaserData.totalStars = statsRes.data.totalStars || 0;
                     console.log("Estrellas históricas cargadas:", initialPhaserData.totalStars);
+
+                    // Retomamos la dificultad del ultimo intento en modo
+                    // historia (1-3), ignorando intentos en modo custom
+                    // (Dificultad=4, no aplica aqui), para no reiniciar
+                    // siempre en Normal cuando el alumno vuelve a jugar.
+                    const recentSessions: { Dificultad: number }[] = statsRes.data.recentSessions || [];
+                    const lastStorySession = recentSessions.find(
+                        (session) => session.Dificultad >= 1 && session.Dificultad <= 3
+                    );
+                    if (lastStorySession) {
+                        initialPhaserData.dificultad = lastStorySession.Dificultad;
+                        console.log("Dificultad retomada del último intento:", initialPhaserData.dificultad);
+                    }
+
+                    // Retomamos en qué nivel del mapa se quedó en cada mundo.
+                    initialPhaserData.nivelMapaTierra = statsRes.data.nivelMapaTierra || 0;
+                    initialPhaserData.nivelMapaAgua = statsRes.data.nivelMapaAgua || 0;
                 }
             } catch (error) {
                 console.error("No se pudo cargar el historial de estrellas:", error);
@@ -91,6 +111,33 @@ export default function PlayPage() {
         // Esto evita que se envíen intentos duplicados a la base de datos
         return () => {
             EventBus.off('gameOverStats', handleGameOverStats);
+        };
+    }, [params.id]);
+
+    // Guarda en qué nivel del mapa quedó el alumno (MapScene.tsx -> evento
+    // 'mapProgress'), para que la próxima sesión retome ahí en vez de
+    // reiniciar siempre en el primer nivel del mundo.
+    useEffect(() => {
+        const handleMapProgress = async ({ element, nivel }: { element: 'tierra' | 'agua'; nivel: number }) => {
+            const idDiscente = params.id;
+            const token = localStorage.getItem('token');
+            if (!idDiscente || !token) return;
+
+            try {
+                const payload = element === 'tierra'
+                    ? { NivelMapaTierra: nivel }
+                    : { NivelMapaAgua: nivel };
+                await api.patch(`/discentes/${idDiscente}`, payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            } catch (error) {
+                console.error("No se pudo guardar el avance del mapa:", error);
+            }
+        };
+
+        EventBus.on('mapProgress', handleMapProgress);
+        return () => {
+            EventBus.off('mapProgress', handleMapProgress);
         };
     }, [params.id]);
 
