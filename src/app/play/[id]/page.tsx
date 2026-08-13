@@ -89,7 +89,7 @@ export default function PlayPage() {
                 console.log("Atrapando estadísticas desde Phaser:", stats);
 
                 // Envío de las estadísticas procesadas al backend
-                await api.post(
+                const response = await api.post(
                     `/discentes/${idDiscente}/attempts`,
                     stats,
                     {
@@ -98,6 +98,16 @@ export default function PlayPage() {
                 );
 
                 console.log("¡Estadísticas guardadas exitosamente en la base de datos!");
+
+                // El aviso de racha/logro ahora lo dibuja NotificationScene
+                // (dentro de Phaser, ver game/scenes/NotificationScene.tsx):
+                // así sobrevive a los cambios de escena y se limpia junto
+                // con ellos, en vez de flotar sobre React encima del canvas.
+                const { logrosNuevos, rachaDias, rachaVictorias } = response.data;
+                if (logrosNuevos && logrosNuevos.length > 0) {
+                    EventBus.emit('logrosUnlocked', logrosNuevos);
+                }
+                EventBus.emit('streakUpdate', { dias: rachaDias, victorias: rachaVictorias });
             } catch (error) {
                 console.error("Fallo al guardar las estadísticas en el backend:", error);
                 showToast("No se pudo guardar el resultado de esta partida.", "error");
@@ -127,9 +137,18 @@ export default function PlayPage() {
                 const payload = element === 'tierra'
                     ? { NivelMapaTierra: nivel }
                     : { NivelMapaAgua: nivel };
-                await api.patch(`/discentes/${idDiscente}`, payload, {
+                const response = await api.patch(`/discentes/${idDiscente}`, payload, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
+
+                // "Mundo Terrestre"/"Mundo Acuático" dependen de este nivel,
+                // no de la partida que se acaba de guardar (ver
+                // StudentsService.update en el backend), así que se
+                // desbloquean aquí, justo al completar el mundo.
+                const { logrosNuevos } = response.data;
+                if (logrosNuevos && logrosNuevos.length > 0) {
+                    EventBus.emit('logrosUnlocked', logrosNuevos);
+                }
             } catch (error) {
                 console.error("No se pudo guardar el avance del mapa:", error);
             }

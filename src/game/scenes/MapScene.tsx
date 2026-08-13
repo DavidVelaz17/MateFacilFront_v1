@@ -72,11 +72,26 @@ export class MapScene extends Phaser.Scene {
             this.playerAvatar.play('idle_map');
         }
 
-        const playButton = this.add.image(width / 2, height / 2, 'btn_jugar_0')
-            .setOrigin(-2.8, -4.5).setInteractive();
+        // Si ya se completo el mundo, este boton reinicia (no avanza de nivel):
+        // usamos el asset "Volver a jugar" para que el texto coincida con lo
+        // que realmente hace. Es el doble de ancho que "Jugar" (192x48 vs
+        // 96x48, misma altura) pero debe verse en el mismo lugar, asi que
+        // anclamos por la esquina inferior derecha (origen 1,1) en un punto
+        // fijo en vez de escalar el origen: el boton mas ancho crece hacia
+        // la izquierda en vez de salirse del canvas por la derecha.
+        // Los pixeles vienen de donde ya se veia bien "Jugar" con el
+        // origen viejo (-2.8, -4.5) en (width/2, height/2).
+        const playButtonRightX = (width / 2) + 364.8;
+        const playButtonBottomY = (height / 2) + 264;
 
-        playButton.on('pointerover', () => playButton.setTexture('btn_jugar_1'));
-        playButton.on('pointerout', () => playButton.setTexture('btn_jugar_0'));
+        const playTextureKey = isWorldCompleted ? 'btn_volver_a_jugar_0' : 'btn_jugar_0';
+        const playTextureKeyHover = isWorldCompleted ? 'btn_volver_a_jugar_1' : 'btn_jugar_1';
+
+        const playButton = this.add.image(playButtonRightX, playButtonBottomY, playTextureKey)
+            .setOrigin(1, 1).setInteractive();
+
+        playButton.on('pointerover', () => playButton.setTexture(playTextureKeyHover));
+        playButton.on('pointerout', () => playButton.setTexture(playTextureKey));
 
         playButton.on('pointerdown', () => {
             if (isWorldCompleted) {
@@ -84,6 +99,7 @@ export class MapScene extends Phaser.Scene {
                 if (this.currentElement === 'tierra') MapScene.currentLevelPointTierra = 0;
                 else MapScene.currentLevelPointAgua = 0;
                 this.emitMapProgress();
+                EventBus.emit('clearNotifications');
 
                 this.scene.restart({ config: this.levelData, totalStars: this.totalStars });
             } else {
@@ -96,6 +112,7 @@ export class MapScene extends Phaser.Scene {
                 // Extraemos la dificultad actual guardada en el estado del mapa
                 const currentDiff = this.levelData.dificultad;
 
+                EventBus.emit('clearNotifications');
                 this.scene.start('TransitionScene', {
                     next: 'GameScene',
                     message: finalLevelData.introText,
@@ -113,6 +130,7 @@ export class MapScene extends Phaser.Scene {
         returnButton.on('pointerout', () => returnButton.setTexture('btn_menu_0'));
         returnButton.on('pointerdown', () => {
             const finalLevelData = this.prepareLevelData(currentPointIndex);
+            EventBus.emit('clearNotifications');
             this.scene.start('MainMenuScene', { config: finalLevelData, mode: 'historia', totalStars: this.totalStars });
         });
 
@@ -187,6 +205,7 @@ export class MapScene extends Phaser.Scene {
                 MapScene.currentLevelPointAgua++;
             }
             this.emitMapProgress();
+            EventBus.emit('clearNotifications');
             this.scene.restart({ config: this.levelData });
         }
     }

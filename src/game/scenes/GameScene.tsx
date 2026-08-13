@@ -381,6 +381,7 @@ export class GameScene extends Phaser.Scene {
                 btn.on('pointerover', () => btn.setTexture('btn_volver_a_jugar_1'));
                 btn.on('pointerout', () => btn.setTexture('btn_volver_a_jugar_0'));
                 btn.on('pointerdown', () => {
+                    EventBus.emit('clearNotifications');
                     this.scene.restart({ config: this.levelData, lives: this.gameState.lives, dificultad: this.currentDifficulty, totalStars: this.totalStarsHistorical, problema: this.currentProblema, historialIntentos: historialActualizado });
                 });
             } else {
@@ -444,6 +445,7 @@ export class GameScene extends Phaser.Scene {
             btn.on('pointerover', () => btn.setTexture('btn_continuar_1'));
             btn.on('pointerout', () => btn.setTexture('btn_continuar_0'));
             btn.on('pointerdown', () => {
+                EventBus.emit('clearNotifications');
                 this.scene.start('TransitionScene', {
                     next: 'MapScene',
                     message: this.levelData.successText,
@@ -494,6 +496,7 @@ export class GameScene extends Phaser.Scene {
         btn.on('pointerover', () => btn.setTexture('btn_reiniciar_1'));
         btn.on('pointerout', () => btn.setTexture('btn_reiniciar_0'));
         btn.on('pointerdown', () => {
+            EventBus.emit('clearNotifications');
             this.scene.restart({ config: this.levelData, lives: 3, dificultad: loweredDifficulty,totalStars: this.totalStarsHistorical });
         });
     }

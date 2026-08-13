@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import api from "@/config/api";
 import { useToast } from "@/components/ToastProvider";
 
-import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, Loader2, ListChecks, X, Check, Heart, Star, TrendingUp } from "lucide-react";
+import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Loader2, ListChecks, X, Check, Heart, Star, TrendingUp, Flame, Target, Lock } from "lucide-react";
 import {
     ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from "recharts";
@@ -37,6 +37,16 @@ interface Desglose {
     eventos?: DesgloseEvento[];
 }
 
+interface Logro {
+    codigo: string;
+    nombre: string;
+    descripcion: string;
+    icono: string;
+    desbloqueado: boolean;
+    fecha: string | null;
+    progreso: { actual: number; total: number } | null;
+}
+
 export default function StatsPage() {
     const router = useRouter();
     const params = useParams();
@@ -48,13 +58,16 @@ export default function StatsPage() {
         attempts: 0,
         topEmotion: "Desconocido",
         difficulty: "Fácil",
-        recentSessions: [] as any[]
+        recentSessions: [] as any[],
+        streaks: { dias: 0, victorias: 0 },
+        logros: [] as Logro[]
     });
 
     const [isLoading, setIsLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSession, setSelectedSession] = useState<any | null>(null);
     const [showProgressModal, setShowProgressModal] = useState(false);
+    const [showLogros, setShowLogros] = useState(true);
     const itemsPerPage = 10;
 
     useEffect(() => {
@@ -86,6 +99,8 @@ export default function StatsPage() {
                     attempts: data.attempts,
                     topEmotion: emocionesMap[data.topEmotion] || "Feliz",
                     difficulty: dificultadMap[data.difficulty] || "Fácil",
+                    streaks: data.streaks || { dias: 0, victorias: 0 },
+                    logros: (data.logros || []) as Logro[],
                     recentSessions: data.recentSessions.map((session: any) => {
                         const dateObj = new Date(session.fecha);
                         const formattedDate = dateObj.toLocaleString('es-MX', {
@@ -333,6 +348,86 @@ export default function StatsPage() {
                         </div>
                     </div>
                 </div>
+
+                {!isLoading && stats.recentSessions.length > 0 && (
+                    <div className="mb-10">
+                        <div className="flex flex-wrap gap-4 mb-6">
+                            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 flex-1 min-w-[200px]">
+                                <div className="p-3 bg-orange-50 rounded-lg text-orange-500 shrink-0">
+                                    <Flame size={22} />
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-bold text-gray-800">{stats.streaks.dias} {stats.streaks.dias === 1 ? 'día' : 'días'}</h3>
+                                    <p className="text-gray-500 text-xs">jugando seguido</p>
+                                </div>
+                            </div>
+                            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 flex-1 min-w-[200px]">
+                                <div className="p-3 bg-purple-50 rounded-lg text-purple-600 shrink-0">
+                                    <Target size={22} />
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-bold text-gray-800">{stats.streaks.victorias} {stats.streaks.victorias === 1 ? 'partida' : 'partidas'}</h3>
+                                    <p className="text-gray-500 text-xs">ganadas seguidas</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-6">
+                            <button
+                                onClick={() => setShowLogros((prev) => !prev)}
+                                className="w-full flex items-center justify-between gap-2 text-left"
+                            >
+                                <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                                    🏅 Logros — {stats.logros.filter(l => l.desbloqueado).length} de {stats.logros.length} desbloqueados
+                                </h3>
+                                {showLogros ? (
+                                    <ChevronUp size={18} className="text-gray-400 shrink-0" />
+                                ) : (
+                                    <ChevronDown size={18} className="text-gray-400 shrink-0" />
+                                )}
+                            </button>
+                            {showLogros && (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
+                                    {stats.logros.map((logro) => (
+                                        <div
+                                            key={logro.codigo}
+                                            className={`rounded-lg p-3 text-center border flex flex-col items-center gap-1.5 ${
+                                                logro.desbloqueado ? "bg-purple-50 border-purple-200" : "bg-gray-50 border-gray-200"
+                                            }`}
+                                        >
+                                            <span className={`text-2xl leading-none ${logro.desbloqueado ? "" : "grayscale opacity-40"}`}>
+                                                {logro.icono}
+                                            </span>
+                                            <span className={`text-xs font-bold ${logro.desbloqueado ? "text-gray-800" : "text-gray-400"}`}>
+                                                {logro.nombre}
+                                            </span>
+                                            <span className="text-[10.5px] text-gray-500 leading-tight min-h-[26px]">
+                                                {logro.descripcion}
+                                            </span>
+                                            {logro.desbloqueado ? (
+                                                <span className="text-[10px] font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+                                                    {new Date(logro.fecha as string).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
+                                                </span>
+                                            ) : logro.progreso ? (
+                                                <div className="w-full">
+                                                    <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-purple-300 rounded-full"
+                                                            style={{ width: `${Math.min(100, (logro.progreso.actual / logro.progreso.total) * 100)}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[10px] text-gray-400">{logro.progreso.actual} / {logro.progreso.total}</span>
+                                                </div>
+                                            ) : (
+                                                <Lock size={12} className="text-gray-300" />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 <div className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">

@@ -23,6 +23,7 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
             const { MapScene } = await import('@/game/scenes/MapScene');
             const { GameScene } = await import('@/game/scenes/GameScene');
             const { TransitionScene } = await import('@/game/scenes/TransitionScene');
+            const { NotificationScene } = await import('@/game/scenes/NotificationScene');
 
             const config: PhaserType.Types.Core.GameConfig = {
                 type: Phaser.AUTO,
@@ -59,6 +60,7 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                 gameRef.current.scene.add('MapScene', MapScene);
                 gameRef.current.scene.add('GameScene', GameScene);
                 gameRef.current.scene.add('TransitionScene', TransitionScene);
+                gameRef.current.scene.add('NotificationScene', NotificationScene);
 
                 setTimeout(() => {
                     if (gameRef.current) {
@@ -66,6 +68,10 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                         gameRef.current.registry.set('totalStars', levelData.totalStars || 0);
                         gameRef.current.registry.set('lastDificultad', levelData.dificultad || 2);
                         gameRef.current.scene.start('PreloadScene', { config: levelData });
+                        // Se lanza aparte (no "start"): corre en paralelo sin
+                        // detener las demas escenas, para poder mostrar avisos
+                        // de racha/logros encima de cualquiera de ellas.
+                        gameRef.current.scene.run('NotificationScene');
                     }
                 }, 100);
             }
@@ -74,8 +80,13 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                 gameRef.current.registry.set('totalStars', levelData.totalStars || 0);
                 gameRef.current.registry.set('lastDificultad', levelData.dificultad || 2);
                 const sceneManager = gameRef.current.scene;
-                sceneManager.getScenes(true).forEach(scene => scene.scene.stop());
+                sceneManager.getScenes(true)
+                    .filter(scene => scene.scene.key !== 'NotificationScene')
+                    .forEach(scene => scene.scene.stop());
                 sceneManager.start('PreloadScene', { config: levelData });
+                if (!sceneManager.isActive('NotificationScene')) {
+                    sceneManager.run('NotificationScene');
+                }
             }
         };
 

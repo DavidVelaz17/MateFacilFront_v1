@@ -53,7 +53,7 @@ export const LevelsTierra: LevelConfig[] = [
         operation: 'resta',
         type: 'repaso',
         bgKey: 'zebra',
-        introText: 'Bienvenido a mi reino, tiene mucho que no veo a alguien por aquí. ' +
+        introText: 'Bienvenido, tiene mucho que no veo a alguien por aquí. ' +
             'Verás, quiero que cuentes las rayas de mi cuerpo, pero no las rayas de mi cabeza ' +
             'para saber si soy una cebra negra con rayas blancas o una cebra blanca con rayas negras. ' +
             'Sé que puedes hacerlo con facilidad.',
