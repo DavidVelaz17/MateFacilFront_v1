@@ -17,8 +17,8 @@ interface DesgloseEvento {
     tiempo: number;
 }
 
-// Un sub-intento por cada vez que el alumno choco con la puerta (una vida
-// perdida genera un sub-intento fallido, mas el final exitoso o no).
+// Un sub-intento fallido se crea por cada vida perdida; el ultimo puede
+// terminar exitoso o no.
 interface DesgloseIntento {
     numero: number;
     exitoso: boolean;
@@ -30,10 +30,9 @@ interface Desglose {
     objetivo: number[];
     trampas: number[];
     resultado: number;
-    // Formato nuevo: multiples sub-intentos.
+    // intentos: formato nuevo (multiples sub-intentos). eventos: formato viejo
+    // (partidas registradas antes de este cambio, un solo arreglo plano).
     intentos?: DesgloseIntento[];
-    // Formato viejo (partidas registradas antes de este cambio): un solo
-    // arreglo plano de eventos, sin distinguir sub-intentos.
     eventos?: DesgloseEvento[];
 }
 
@@ -251,10 +250,8 @@ export default function StatsPage() {
         </table>
     );
 
-    // --- DATOS PARA LA GRÁFICA DE AVANCE (orden cronológico ascendente) ---
-    // Cada punto es un intento real (a diferencia de la gráfica del grupo,
-    // que sí agrupa por día): incluimos la hora para que dos intentos del
-    // mismo día no compartan la misma etiqueta en el eje X.
+    // Se incluye la hora (a diferencia de la grafica del grupo, que agrupa por
+    // dia) para que dos intentos del mismo dia no compartan etiqueta en el eje X.
     const progressChartData = [...stats.recentSessions]
         .sort((a, b) => a.fechaRaw.getTime() - b.fechaRaw.getTime())
         .map((session) => ({
@@ -265,7 +262,6 @@ export default function StatsPage() {
             dificultad: session.dificultadNum
         }));
 
-    // --- LÓGICA DE PAGINACIÓN ---
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentSessions = stats.recentSessions.slice(indexOfFirstItem, indexOfLastItem);
@@ -464,7 +460,6 @@ export default function StatsPage() {
                             </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 text-gray-700">
-                            {/* Iteramos sobre currentSessions en lugar de todo el arreglo */}
                             {currentSessions.map((session, index) => (
                                 <tr key={index} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-3">{session.date}</td>
@@ -500,7 +495,6 @@ export default function StatsPage() {
                         </table>
                         )}
 
-                        {/* Mensaje de sin datos */}
                         {!isLoading && stats.recentSessions.length === 0 && (
                             <div className="p-6 text-center text-gray-500">
                                 No hay sesiones registradas aún.
@@ -508,7 +502,6 @@ export default function StatsPage() {
                         )}
                     </div>
 
-                    {/* CONTROLES DE PAGINACIÓN */}
                     {stats.recentSessions.length > 0 && (
                         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
                             <span className="text-sm text-gray-500">
