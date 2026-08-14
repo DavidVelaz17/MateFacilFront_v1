@@ -29,7 +29,6 @@ export default function AdminDashboard() {
     const { docenteId, logout } = useAuth();
     const { showToast } = useToast();
 
-    // --- ESTADOS ---
     const [activeView, setActiveView] = useState<'docentes' | 'alumnos'>('docentes');
 
     const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -38,7 +37,6 @@ export default function AdminDashboard() {
     const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-    // Estados para el modal de confirmacion de borrado
     const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
     const [deleteImpact, setDeleteImpact] = useState<{ groupsCount: number; groupNames: string[]; studentsCount: number } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -51,7 +49,6 @@ export default function AdminDashboard() {
         Password: ""
     });
 
-    // --- ESTADOS DE ALUMNOS ---
     const [students, setStudents] = useState<Student[]>([]);
     const [isLoadingStudents, setIsLoadingStudents] = useState(true);
     const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -65,8 +62,7 @@ export default function AdminDashboard() {
     const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
     const [isDeletingStudent, setIsDeletingStudent] = useState(false);
 
-    // --- EFECTOS ---
-    // Una vez que useAuth confirma la sesion (docenteId listo), cargamos los docentes y alumnos
+    // Espera a que useAuth confirme la sesion (docenteId listo) antes de cargar datos.
     useEffect(() => {
         if (docenteId !== null) {
             fetchTeachers();
@@ -74,7 +70,6 @@ export default function AdminDashboard() {
         }
     }, [docenteId]);
 
-    // --- MANEJADORES DE BASE DE DATOS (AXIOS) ---
     const fetchTeachers = async () => {
         setIsLoadingTeachers(true);
         try {
@@ -116,15 +111,13 @@ export default function AdminDashboard() {
         e.preventDefault();
         try {
             if (editingTeacher) {
-                // MODO EDICIÓN
                 await api.patch(`/teachers/${editingTeacher.id_docente}`, formData);
             } else {
-                // MODO CREACIÓN
                 await api.post("/teachers", formData);
             }
             setIsModalOpen(false);
             showToast(editingTeacher ? "Docente actualizado correctamente." : "Docente creado correctamente.", "success");
-            fetchTeachers(); // Recargar la tabla con los datos nuevos
+            fetchTeachers();
         } catch (error) {
             console.error("Error al guardar docente:", error);
             const mensaje = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
@@ -151,7 +144,7 @@ export default function AdminDashboard() {
             setTeacherToDelete(null);
             setDeleteImpact(null);
             showToast("Docente eliminado.", "success");
-            fetchTeachers(); // Recargar la tabla sin el docente eliminado
+            fetchTeachers();
         } catch (error) {
             console.error("Error al eliminar docente:", error);
             showToast("Hubo un error al eliminar el docente.", "error");
@@ -160,7 +153,6 @@ export default function AdminDashboard() {
         }
     };
 
-    // --- MANEJADORES DE ALUMNOS (CRUD) ---
     const fetchStudents = async () => {
         setIsLoadingStudents(true);
         try {
@@ -208,8 +200,7 @@ export default function AdminDashboard() {
         }
     };
 
-    // Dar de baja / reactivar: a diferencia de eliminar, es reversible y no
-    // borra el historial de intentos del alumno.
+    // A diferencia de eliminar, dar de baja es reversible y conserva el historial.
     const handleToggleActiveStudent = async (student: Student) => {
         setTogglingStudentId(student.id_discente);
         try {
@@ -245,7 +236,6 @@ export default function AdminDashboard() {
     return (
         <div className="flex h-screen bg-gray-50 text-black overflow-hidden relative">
 
-            {/* Overlay para cerrar la barra lateral en movil */}
             {isSidebarOpen && (
                 <div
                     className="fixed inset-0 bg-black/40 z-30 md:hidden"
@@ -253,7 +243,6 @@ export default function AdminDashboard() {
                 />
             )}
 
-            {/* ================= BARRA LATERAL ================= */}
             <aside className={`fixed md:relative inset-y-0 left-0 z-40 w-72 bg-slate-900 text-white flex flex-col shadow-2xl transform transition-transform duration-200 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
                 <div className="p-6 border-b border-slate-800 flex items-center gap-3">
                     <div className="p-2 bg-red-600 rounded-lg shadow-lg shadow-red-500/30">
@@ -303,7 +292,6 @@ export default function AdminDashboard() {
                 </div>
             </aside>
 
-            {/* ================= CONTENIDO PRINCIPAL ================= */}
             <main className="flex-1 overflow-y-auto p-4 sm:p-8 relative">
                 <div className="max-w-6xl mx-auto">
 
@@ -452,7 +440,6 @@ export default function AdminDashboard() {
                 </div>
             </main>
 
-            {/* ================= MODAL DE DOCENTE ================= */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg relative overflow-hidden ring-1 ring-gray-200">
@@ -470,7 +457,6 @@ export default function AdminDashboard() {
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre(s)</label>
-                                    {/* CORRECCIÓN: value y onChange ahora apuntan a Nombre_Docente */}
                                     <input value={formData.Nombre_Docente} onChange={(e) => setFormData({...formData, Nombre_Docente: e.target.value})} className="w-full border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none text-gray-900 bg-white" required />
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -508,7 +494,6 @@ export default function AdminDashboard() {
                 </div>
             )}
 
-            {/* ================= MODAL DE CONFIRMACIÓN DE BORRADO ================= */}
             {teacherToDelete && (
                 <ConfirmDeleteModal
                     title="Eliminar Docente"
@@ -537,7 +522,6 @@ export default function AdminDashboard() {
                 />
             )}
 
-            {/* ================= MODAL DE ALUMNO ================= */}
             {isStudentModalOpen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative overflow-hidden ring-1 ring-gray-200">
@@ -592,7 +576,6 @@ export default function AdminDashboard() {
                 </div>
             )}
 
-            {/* ================= MODAL DE CONFIRMACIÓN DE BORRADO DE ALUMNO ================= */}
             {studentToDelete && (
                 <ConfirmDeleteModal
                     title="Eliminar Alumno"
