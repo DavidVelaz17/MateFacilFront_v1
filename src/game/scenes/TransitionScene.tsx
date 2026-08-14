@@ -1,7 +1,6 @@
 import * as Phaser from 'phaser';
 import {audioManager} from "@/game/scenes/audioManager";
 
-// Traduce el bgKey del nivel al prefijo usado por las claves de audio de voces
 const ANIMAL_VOICE_PREFIX: Record<string, string> = {
     leon: 'leon',
     mono: 'monky',

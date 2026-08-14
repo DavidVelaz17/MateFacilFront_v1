@@ -17,7 +17,6 @@ export default function PlayPage() {
     const { showToast } = useToast();
     const [levelData, setLevelData] = useState<any>(null);
 
-    // 1. EFECTO ORIGINAL: Carga la configuración del nivel
     useEffect(() => {
         const fetchInitialData = async () => {
             const mode = searchParams.get('mode');
@@ -44,10 +43,8 @@ export default function PlayPage() {
                     initialPhaserData.totalStars = statsRes.data.totalStars || 0;
                     console.log("Estrellas históricas cargadas:", initialPhaserData.totalStars);
 
-                    // Retomamos la dificultad del ultimo intento en modo
-                    // historia (1-3), ignorando intentos en modo custom
-                    // (Dificultad=4, no aplica aqui), para no reiniciar
-                    // siempre en Normal cuando el alumno vuelve a jugar.
+                    // Retoma la dificultad del ultimo intento en modo historia (1-3);
+                    // ignora custom (Dificultad=4) para no reiniciar siempre en Normal.
                     const recentSessions: { Dificultad: number }[] = statsRes.data.recentSessions || [];
                     const lastStorySession = recentSessions.find(
                         (session) => session.Dificultad >= 1 && session.Dificultad <= 3
@@ -57,7 +54,6 @@ export default function PlayPage() {
                         console.log("Dificultad retomada del último intento:", initialPhaserData.dificultad);
                     }
 
-                    // Retomamos en qué nivel del mapa se quedó en cada mundo.
                     initialPhaserData.nivelMapaTierra = statsRes.data.nivelMapaTierra || 0;
                     initialPhaserData.nivelMapaAgua = statsRes.data.nivelMapaAgua || 0;
                 }
@@ -75,7 +71,6 @@ export default function PlayPage() {
             const idDiscente = params.id;
             const token = localStorage.getItem('token');
 
-            // Validaciones de seguridad
             if (!idDiscente) {
                 console.error("Error: No se encontró el ID del alumno en la URL.");
                 return;
@@ -88,10 +83,11 @@ export default function PlayPage() {
             try {
                 console.log("Atrapando estadísticas desde Phaser:", stats);
 
-                // Envío de las estadísticas procesadas al backend
+                // TzOffset: el backend agrupa la racha de dias por el dia
+                // calendario local del alumno, no por UTC.
                 const response = await api.post(
                     `/discentes/${idDiscente}/attempts`,
-                    stats,
+                    { ...stats, TzOffset: new Date().getTimezoneOffset() },
                     {
                         headers: { Authorization: `Bearer ${token}` }
                     }
@@ -99,10 +95,8 @@ export default function PlayPage() {
 
                 console.log("¡Estadísticas guardadas exitosamente en la base de datos!");
 
-                // El aviso de racha/logro ahora lo dibuja NotificationScene
-                // (dentro de Phaser, ver game/scenes/NotificationScene.tsx):
-                // así sobrevive a los cambios de escena y se limpia junto
-                // con ellos, en vez de flotar sobre React encima del canvas.
+                // NotificationScene (dentro de Phaser) dibuja el aviso de racha/logro
+                // para que sobreviva a cambios de escena, en vez de flotar sobre React.
                 const { logrosNuevos, rachaDias, rachaVictorias } = response.data;
                 if (logrosNuevos && logrosNuevos.length > 0) {
                     EventBus.emit('logrosUnlocked', logrosNuevos);
@@ -114,19 +108,16 @@ export default function PlayPage() {
             }
         };
 
-        // Encendemos el "micrófono" para escuchar a Phaser
         EventBus.on('gameOverStats', handleGameOverStats);
 
-        // FUNCIÓN DE LIMPIEZA: Apagamos el "micrófono" si el docente sale de la página
-        // Esto evita que se envíen intentos duplicados a la base de datos
+        // Se desuscribe al desmontar para no enviar intentos duplicados al backend.
         return () => {
             EventBus.off('gameOverStats', handleGameOverStats);
         };
     }, [params.id]);
 
-    // Guarda en qué nivel del mapa quedó el alumno (MapScene.tsx -> evento
-    // 'mapProgress'), para que la próxima sesión retome ahí en vez de
-    // reiniciar siempre en el primer nivel del mundo.
+    // Escucha 'mapProgress' (MapScene.tsx) y lo guarda para que la proxima
+    // sesion retome ahi en vez de reiniciar en el primer nivel del mundo.
     useEffect(() => {
         const handleMapProgress = async ({ element, nivel }: { element: 'tierra' | 'agua'; nivel: number }) => {
             const idDiscente = params.id;
@@ -141,10 +132,8 @@ export default function PlayPage() {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
-                // "Mundo Terrestre"/"Mundo Acuático" dependen de este nivel,
-                // no de la partida que se acaba de guardar (ver
-                // StudentsService.update en el backend), así que se
-                // desbloquean aquí, justo al completar el mundo.
+                // Los logros de "Mundo Terrestre/Acuático" dependen de este nivel
+                // (StudentsService.update en el backend), no de la partida guardada.
                 const { logrosNuevos } = response.data;
                 if (logrosNuevos && logrosNuevos.length > 0) {
                     EventBus.emit('logrosUnlocked', logrosNuevos);

@@ -1,0 +1,353 @@
+"use client";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import api from "@/config/api";
+import { useToast } from "@/components/ToastProvider";
+import {
+    ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+    ScatterChart, Scatter, ReferenceLine
+} from "recharts";
+import { ArrowLeft, Printer, Loader2, Flame, Target } from "lucide-react";
+
+type Rango = "hoy" | "semana" | "mes" | "personalizado";
+
+const fmtCorto = (d: Date) => d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+// Componentes LOCALES, no toISOString (da UTC y desfasa el campo un dia).
+function toDateInputValue(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+// new Date("YYYY-MM-DD") interpreta medianoche UTC, no el dia local elegido.
+function parseLocalDateInput(value: string, endOfDay: boolean): Date {
+    const [y, m, d] = value.split('-').map(Number);
+    return endOfDay
+        ? new Date(y, m - 1, d, 23, 59, 59, 999)
+        : new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
+// Usa limites de dia en hora LOCAL (no UTC): un intento nocturno podria
+// colarse en el dia equivocado si se mezclara con limites UTC.
+function getRangeDates(
+    rango: Rango,
+    customDesde: string,
+    customHasta: string,
+): { desdeISO: string; hastaISO: string; label: string } {
+    if (rango === "personalizado") {
+        const desdeStr = customDesde || toDateInputValue(new Date());
+        const hastaStr = customHasta && customHasta >= desdeStr ? customHasta : desdeStr;
+        const inicio = parseLocalDateInput(desdeStr, false);
+        const fin = parseLocalDateInput(hastaStr, true);
+        const label = hastaStr === desdeStr ? fmtCorto(inicio) : `${fmtCorto(inicio)} — ${fmtCorto(fin)}`;
+        return { desdeISO: inicio.toISOString(), hastaISO: fin.toISOString(), label };
+    }
+
+    const ahora = new Date();
+    const inicioHoyLocal = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0, 0);
+    const finHoyLocal = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59, 999);
+
+    const inicioLocal = new Date(inicioHoyLocal);
+    if (rango === "semana") inicioLocal.setDate(inicioHoyLocal.getDate() - 6);
+    else if (rango === "mes") inicioLocal.setDate(inicioHoyLocal.getDate() - 29);
+
+    const label = rango === "hoy" ? fmtCorto(inicioHoyLocal) : `${fmtCorto(inicioLocal)} — ${fmtCorto(finHoyLocal)}`;
+
+    return { desdeISO: inicioLocal.toISOString(), hastaISO: finHoyLocal.toISOString(), label };
+}
+
+const RANGO_LABEL: Record<Rango, string> = {
+    hoy: "Hoy",
+    semana: "Últimos 7 días",
+    mes: "Últimos 30 días",
+    personalizado: "Personalizado",
+};
+
+function iniciales(nombre: string): string {
+    return nombre
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p[0]?.toUpperCase() || '')
+        .join('');
+}
+
+// isoDate ya es dia local (backend). Se parsea a mano: Date/toLocaleDateString
+// reinterpretaria "YYYY-MM-DD" como UTC y desplazaria la fecha.
+const formatShortDate = (isoDate: string) => {
+    const [, m, d] = isoDate.split('-');
+    return `${d}/${m}`;
+};
+
+interface PerStudentPeriodo {
+    id_discente: number;
+    nombre: string;
+    intentosPeriodo: number;
+    avgPuntosPeriodo: number | null;
+    jugoEnPeriodo: boolean;
+    rachaDias: number;
+    rachaVictorias: number;
+}
+
+interface PerStudentActual {
+    id_discente: number;
+    nombre: string;
+    attempts: number;
+    avgPuntos: number;
+    avgDificultad: number;
+}
+
+interface GroupReportData {
+    groupName: string;
+    docenteName: string | null;
+    resumenGrupoPeriodo: {
+        totalIntentos: number; alumnosActivos: number; alumnosTotal: number;
+        avgPuntos: number; avgDificultad: number;
+    };
+    groupAveragesPeriodo: { fecha: string; avgPuntos: number; avgDificultad: number | null }[];
+    perStudentPeriodo: PerStudentPeriodo[];
+    perStudentEstadoActual: PerStudentActual[];
+}
+
+// En papel no hay cursor para tooltip, asi que cada punto se rotula
+// (a diferencia de la version en pantalla del dashboard).
+function DotConInicial(props: any) {
+    const { cx, cy, payload } = props;
+    return (
+        <g>
+            <circle cx={cx} cy={cy} r={5} fill="#7c3aed" stroke="#fff" strokeWidth={1} />
+            <text x={cx + 8} y={cy + 3} fontSize={10} fill="#374151">{iniciales(payload.nombre)}</text>
+        </g>
+    );
+}
+
+export default function ReporteGrupoPage() {
+    const router = useRouter();
+    const params = useParams();
+    const { showToast } = useToast();
+
+    const [rango, setRango] = useState<Rango>("hoy");
+    const [customDesde, setCustomDesde] = useState<string>(() => toDateInputValue(new Date()));
+    const [customHasta, setCustomHasta] = useState<string>(() => toDateInputValue(new Date()));
+    const [data, setData] = useState<GroupReportData | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchReport = async () => {
+            setIsLoading(true);
+            try {
+                const { desdeISO, hastaISO } = getRangeDates(rango, customDesde, customHasta);
+                const res = await api.get(`/groups/${params.id}/report`, {
+                    params: { desde: desdeISO, hasta: hastaISO, tzOffset: new Date().getTimezoneOffset() }
+                });
+                setData(res.data);
+            } catch (error) {
+                console.error("Error al cargar el reporte del grupo", error);
+                showToast("No se pudo cargar el reporte del grupo.", "error");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchReport();
+    }, [rango, customDesde, customHasta, params.id]);
+
+    const groupAveragesChartData = (data?.groupAveragesPeriodo || []).map((p) => ({
+        fecha: formatShortDate(p.fecha), puntos: p.avgPuntos, dificultad: p.avgDificultad,
+    }));
+
+    const { label: rangoLabel } = getRangeDates(rango, customDesde, customHasta);
+
+    return (
+        <div className="min-h-screen bg-gray-50 p-8 text-black print:p-0">
+            <div className="print:hidden max-w-4xl mx-auto mb-6 flex flex-wrap items-center justify-between gap-4">
+                <button onClick={() => router.back()} className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium">
+                    <ArrowLeft size={20} /> Volver
+                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex bg-white border border-gray-200 rounded-lg overflow-hidden">
+                        {(["hoy", "semana", "mes", "personalizado"] as Rango[]).map((r) => (
+                            <button
+                                key={r}
+                                onClick={() => setRango(r)}
+                                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                                    rango === r ? "bg-purple-600 text-white" : "text-gray-600 hover:bg-gray-100"
+                                }`}
+                            >
+                                {RANGO_LABEL[r]}
+                            </button>
+                        ))}
+                    </div>
+                    {rango === "personalizado" && (
+                        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5">
+                            <input
+                                type="date"
+                                value={customDesde}
+                                max={customHasta}
+                                onChange={(e) => setCustomDesde(e.target.value)}
+                                className="text-sm text-gray-700 outline-none"
+                            />
+                            <span className="text-gray-400 text-sm">—</span>
+                            <input
+                                type="date"
+                                value={customHasta}
+                                min={customDesde}
+                                max={toDateInputValue(new Date())}
+                                onChange={(e) => setCustomHasta(e.target.value)}
+                                className="text-sm text-gray-700 outline-none"
+                            />
+                        </div>
+                    )}
+                    <button
+                        onClick={() => window.print()}
+                        className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium"
+                    >
+                        <Printer size={18} /> Imprimir
+                    </button>
+                </div>
+            </div>
+
+            {isLoading || !data ? (
+                <div className="flex justify-center py-20 text-gray-400"><Loader2 size={28} className="animate-spin" /></div>
+            ) : (
+                <div className="max-w-4xl mx-auto bg-white print:shadow-none shadow-sm border border-gray-200 print:border-0 rounded-xl p-8 print:p-0">
+                    <header className="mb-8 pb-6 border-b border-gray-200">
+                        <p className="text-xs font-bold uppercase tracking-wide text-purple-600 mb-1">MateFácil · Reporte de Grupo</p>
+                        <h1 className="text-2xl font-bold text-gray-900">{data.groupName}</h1>
+                        <p className="text-sm text-gray-500 mt-1">
+                            {data.docenteName ? `Docente: ${data.docenteName} · ` : ''}Periodo: {RANGO_LABEL[rango]} ({rangoLabel})
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">Generado el {new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                    </header>
+
+                    <section className="mb-8 break-inside-avoid">
+                        <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">Resumen del periodo</h2>
+                        <div className="grid grid-cols-4 gap-4">
+                            <div className="border border-gray-200 rounded-lg p-3 text-center">
+                                <p className="text-xl font-bold text-gray-800">{data.resumenGrupoPeriodo.totalIntentos}</p>
+                                <p className="text-[10px] text-gray-500 uppercase">Partidas jugadas</p>
+                            </div>
+                            <div className="border border-gray-200 rounded-lg p-3 text-center">
+                                <p className="text-xl font-bold text-gray-800">{data.resumenGrupoPeriodo.alumnosActivos}/{data.resumenGrupoPeriodo.alumnosTotal}</p>
+                                <p className="text-[10px] text-gray-500 uppercase">Alumnos activos</p>
+                            </div>
+                            <div className="border border-gray-200 rounded-lg p-3 text-center">
+                                <p className="text-xl font-bold text-gray-800">{data.resumenGrupoPeriodo.avgPuntos}</p>
+                                <p className="text-[10px] text-gray-500 uppercase">Puntaje promedio</p>
+                            </div>
+                            <div className="border border-gray-200 rounded-lg p-3 text-center">
+                                <p className="text-xl font-bold text-gray-800">{data.resumenGrupoPeriodo.avgDificultad}</p>
+                                <p className="text-[10px] text-gray-500 uppercase">Dificultad promedio</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    {groupAveragesChartData.length > 0 && (
+                        <section className="mb-8 break-inside-avoid">
+                            <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">Promedio del grupo por día</h2>
+                            <div className="w-full h-64">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={groupAveragesChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                        <XAxis dataKey="fecha" tick={{ fontSize: 12 }} />
+                                        <YAxis yAxisId="puntos" domain={[0, 100]} tick={{ fontSize: 12 }} />
+                                        <YAxis yAxisId="dificultad" orientation="right" domain={[0, 4]} allowDecimals={false} tick={{ fontSize: 12 }} />
+                                        <Tooltip />
+                                        <Legend />
+                                        <Line yAxisId="puntos" type="monotone" dataKey="puntos" name="Puntaje promedio" stroke="#7c3aed" strokeWidth={2} dot={{ r: 3 }} />
+                                        <Line yAxisId="dificultad" type="monotone" dataKey="dificultad" name="Dificultad promedio" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </section>
+                    )}
+
+                    {data.perStudentEstadoActual.length > 0 && (
+                        <section className="mb-8 break-inside-avoid">
+                            <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">Desempeño actual por alumno (histórico completo)</h2>
+                            <div className="w-full h-72">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <ScatterChart margin={{ top: 5, right: 30, left: -10, bottom: 20 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                        <XAxis
+                                            type="number" dataKey="avgPuntos" name="Puntaje promedio" domain={[0, 100]} tick={{ fontSize: 12 }}
+                                            label={{ value: 'Puntaje promedio', position: 'insideBottom', offset: -8, fontSize: 12, fill: '#6b7280' }}
+                                        />
+                                        <YAxis
+                                            type="number" dataKey="avgDificultad" name="Dificultad promedio" domain={[0.5, 3.5]} tick={{ fontSize: 12 }}
+                                            label={{ value: 'Dificultad promedio', angle: -90, position: 'insideLeft', fontSize: 12, fill: '#6b7280' }}
+                                        />
+                                        <ReferenceLine x={50} stroke="#d1d5db" strokeDasharray="4 4" />
+                                        <ReferenceLine y={2} stroke="#d1d5db" strokeDasharray="4 4" />
+                                        <Scatter data={data.perStudentEstadoActual} shape={<DotConInicial />} />
+                                    </ScatterChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <table className="min-w-full text-sm mt-3">
+                                <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
+                                    <tr>
+                                        <th className="px-3 py-2 text-left">Iniciales</th>
+                                        <th className="px-3 py-2 text-left">Alumno</th>
+                                        <th className="px-3 py-2 text-left">Puntaje prom.</th>
+                                        <th className="px-3 py-2 text-left">Dificultad prom.</th>
+                                        <th className="px-3 py-2 text-left">Partidas totales</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {data.perStudentEstadoActual.map((s) => (
+                                        <tr key={s.id_discente}>
+                                            <td className="px-3 py-2 font-mono font-bold">{iniciales(s.nombre)}</td>
+                                            <td className="px-3 py-2">{s.nombre}</td>
+                                            <td className="px-3 py-2">{s.avgPuntos}</td>
+                                            <td className="px-3 py-2">{s.avgDificultad}</td>
+                                            <td className="px-3 py-2">{s.attempts}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </section>
+                    )}
+
+                    <section className="break-inside-avoid">
+                        <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">Actividad por alumno en el periodo</h2>
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
+                                <tr>
+                                    <th className="px-3 py-2 text-left">Alumno</th>
+                                    <th className="px-3 py-2 text-left">Partidas</th>
+                                    <th className="px-3 py-2 text-left">Puntaje prom.</th>
+                                    <th className="px-3 py-2 text-left">Racha días</th>
+                                    <th className="px-3 py-2 text-left">Racha victorias</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {data.perStudentPeriodo.map((s) => (
+                                    <tr key={s.id_discente} className={!s.jugoEnPeriodo ? "bg-red-50" : undefined}>
+                                        <td className="px-3 py-2 font-medium">{s.nombre}</td>
+                                        <td className="px-3 py-2">
+                                            {s.jugoEnPeriodo ? s.intentosPeriodo : (
+                                                <span className="text-red-600 font-semibold">No jugó</span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2">{s.avgPuntosPeriodo ?? '—'}</td>
+                                        <td className="px-3 py-2">
+                                            {s.rachaDias >= 2 ? (
+                                                <span className="inline-flex items-center gap-1"><Flame size={12} className="text-orange-500" /> {s.rachaDias}</span>
+                                            ) : '—'}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {s.rachaVictorias >= 2 ? (
+                                                <span className="inline-flex items-center gap-1"><Target size={12} className="text-purple-600" /> {s.rachaVictorias}</span>
+                                            ) : '—'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </section>
+                </div>
+            )}
+        </div>
+    );
+}

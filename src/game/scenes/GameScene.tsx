@@ -9,8 +9,6 @@ import {audioManager} from "@/game/scenes/audioManager";
 import { generateProblema } from './exerciseGenerator';
 import type { DificultadNum, ProblemaMatematico } from './LevelsData';
 
-// Un evento por cada numero recogido durante la partida (correcto o
-// trampa), en el orden en que el alumno lo recogio.
 interface DesgloseEvento {
     orden: number;
     valor: number;
@@ -19,9 +17,8 @@ interface DesgloseEvento {
     tiempo: number;
 }
 
-// Un sub-intento por cada vez que el alumno choco con la puerta: una vida
-// perdida genera un sub-intento fallido y reinicia el mismo problema; el
-// ultimo sub-intento puede ser exitoso o, si se quedo sin vidas, fallido.
+// Un sub-intento fallido se crea por cada vida perdida (choque con la
+// puerta); el ultimo puede terminar exitoso o, sin vidas, fallido.
 interface SubIntentoDesglose {
     numero: number;
     exitoso: boolean;
@@ -41,9 +38,8 @@ export class GameScene extends Phaser.Scene {
     private bgMusic!: Phaser.Sound.BaseSound;
     private currentDifficulty: number = 2;
     private totalStarsHistorical: number = 0;
-    // Problema procedural generado para este intento (Modo Historia). Se
-    // reutiliza en los reintentos con vidas restantes para no cambiar el
-    // ejercicio a media partida; se regenera en un intento nuevo/nivel nuevo.
+    // Se reutiliza en reintentos con vidas restantes para no cambiar el
+    // ejercicio a media partida; se regenera en intento/nivel nuevo.
     private currentProblema: ProblemaMatematico | null = null;
 
     private levelData: any = null;
@@ -59,10 +55,8 @@ export class GameScene extends Phaser.Scene {
     private gameState = {
         collectedNumbers: [] as number[],
         desglose: [] as DesgloseEvento[],
-        // Sub-intentos fallidos de esta misma partida (se recibe y se
-        // reenvia a traves de scene.restart para sobrevivir a los
-        // reintentos con vidas restantes; se reinicia solo en una partida
-        // realmente nueva).
+        // Se pasa a traves de scene.restart (init(data)) para sobrevivir a
+        // reintentos con vidas restantes; se reinicia solo en partida nueva.
         historialIntentos: [] as SubIntentoDesglose[],
         elapsedTime: 0,
         lastEmittedTime: 0,
@@ -106,8 +100,7 @@ export class GameScene extends Phaser.Scene {
                 const dificultadGenerador = Phaser.Math.Clamp(this.currentDifficulty, 1, 3) as DificultadNum;
                 const esPrueba = this.levelData.type === 'prueba';
 
-                // Si venimos de un reintento con vidas restantes (mismo nivel),
-                // reutilizamos el problema ya generado en vez de crear uno nuevo.
+                // Reintento con vidas restantes: reutiliza el problema ya generado.
                 const problemaActual: ProblemaMatematico = data.problema
                     ?? generateProblema(this.levelData.operation, dificultadGenerador, esPrueba);
 
@@ -129,7 +122,7 @@ export class GameScene extends Phaser.Scene {
 
         this.physics.world.setBounds(0, 0, gameWidth, playableHeight);
 
-        // En PC (sin touch) mostramos el fondo con el tutorial de controles de teclado.
+        // En PC (sin touch) se usa el fondo con tutorial de controles de teclado.
         const isTouchDevice = this.sys.game.device.input.touch;
         const backgroundKey = this.currentElement === 'agua'
             ? (isTouchDevice ? 'bg_agua' : 'bg_agua_tutorial')
@@ -289,8 +282,7 @@ export class GameScene extends Phaser.Scene {
         if (numItem.itemType === 'number') {
             this.gameState.collectedNumbers.push(numItem.itemValue);
 
-            // Resta y division no son conmutativas: la cifra recogida debe
-            // coincidir con la posicion esperada, no solo con el conjunto.
+            // Resta y division no son conmutativas: la posicion importa, no solo el conjunto.
             const isOrderSensitive = this.levelData?.operation === 'resta' || this.levelData?.operation === 'division';
             const collectedIndex = this.gameState.collectedNumbers.length - 1;
             const isCorrectNumber = isOrderSensitive
@@ -359,8 +351,7 @@ export class GameScene extends Phaser.Scene {
                 }
                 this.physics.pause();
 
-                // Este sub-intento fallo: lo guardamos en el historial para
-                // que sobreviva al reinicio de la escena (mismo problema).
+                // Se guarda en el historial para sobrevivir al scene.restart.
                 const historialActualizado: SubIntentoDesglose[] = [
                     ...this.gameState.historialIntentos,
                     {
@@ -390,7 +381,6 @@ export class GameScene extends Phaser.Scene {
             return;
         }
 
-        // Logica de victoria
         this.gameState.isGameOver = true;
         this.emotionState.transitionTo(new SuperHappyState());
         doorSprite.setTexture('door_open');

@@ -13,14 +13,11 @@ interface RachaData {
     victorias: number;
 }
 
-// Escena que se lanza una sola vez y nunca se detiene (ver PhaserGame.tsx):
-// vive por encima de GameScene/MapScene/TransitionScene sin importar cual
-// este activa. Muestra el aviso de racha y la cola de logros arriba a la
-// izquierda, y se limpia explicitamente via el evento 'clearNotifications'
-// que las demas escenas emiten justo antes de cambiar de escena (ver los
-// botones de Continuar/Reiniciar/Volver a jugar/Menu), en vez de depender
-// de un temporizador que puede dejar el aviso flotando sobre la pantalla
-// equivocada.
+// Se lanza una sola vez (scene.run, ver PhaserGame.tsx) y nunca se detiene:
+// vive sobre GameScene/MapScene/TransitionScene sin importar cual este activa.
+// Se limpia via el evento 'clearNotifications' que las demas escenas emiten
+// antes de cambiar de escena, en vez de depender de un timer que podria
+// dejar el aviso flotando sobre la pantalla equivocada.
 export class NotificationScene extends Phaser.Scene {
     private streakText: Phaser.GameObjects.Text | null = null;
     private streakBg: Phaser.GameObjects.Rectangle | null = null;

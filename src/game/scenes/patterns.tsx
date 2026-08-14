@@ -1,34 +1,26 @@
 import * as Phaser from 'phaser';
 
 export const MapConfig = {
-    // Coordenadas de los puntos del Mapa Tierra (centros medidos sobre
-    // mapa_tierra.png, 800x618, escalados al lienzo de 800x600 del juego)
+    // Coordenadas medidas sobre mapa_tierra.png (800x618), escaladas al lienzo 800x600.
     pointDataTierra: [
-        { x: 170, y: 532 }, // Punto 1 (circulo verde)
-        { x: 253, y: 211 }, // Punto 2 (circulo amarillo)
-        { x: 380, y: 407 }, // Punto 3 (circulo morado)
-        { x: 515, y: 502 }, // Punto 4 (circulo azul)
-        { x: 687, y: 211 } // Punto 5 (circulo rosa)
+        { x: 170, y: 532 },
+        { x: 253, y: 211 },
+        { x: 380, y: 407 },
+        { x: 515, y: 502 },
+        { x: 687, y: 211 }
     ],
-    // Coordenadas de los puntos del Mapa Agua (centros medidos sobre
-    // mapa_agua.png, 800x618, escalados al lienzo de 800x600 del juego)
+    // Coordenadas medidas sobre mapa_agua.png (800x618), escaladas al lienzo 800x600.
     pointDataAgua: [
-        { x: 104, y: 522 }, // Punto 1 (circulo verde)
-        { x: 275, y: 169 }, // Punto 2 (circulo amarillo)
-        { x: 362, y: 315 }, // Punto 3 (circulo morado)
-        { x: 626, y: 463 }, // Punto 4 (circulo azul)
-        { x: 630, y: 207 } // Punto 5 (circulo rosa)
+        { x: 104, y: 522 },
+        { x: 275, y: 169 },
+        { x: 362, y: 315 },
+        { x: 626, y: 463 },
+        { x: 630, y: 207 }
     ]
 };
 
-// ==========================================
-// 1. OBSERVER
-// ==========================================
 export const EventBus = new Phaser.Events.EventEmitter();
 
-// ==========================================
-// 2. STRATEGY
-// ==========================================
 export class MathStrategy {
     private targetNumbers: number[];
     private operation?: string;
@@ -39,8 +31,7 @@ export class MathStrategy {
     }
 
     // Resta y division no son conmutativas: el orden de recoleccion debe
-    // coincidir con el orden en que se genero el ejercicio (mayor->menor,
-    // dividendo->divisor), o el resultado real seria distinto al esperado.
+    // coincidir con el orden de generacion (mayor->menor, dividendo->divisor).
     private get isOrderSensitive(): boolean {
         return this.operation === 'resta' || this.operation === 'division';
     }
@@ -56,9 +47,6 @@ export class MathStrategy {
     }
 }
 
-// ==========================================
-// 3. STATE
-// ==========================================
 export interface EmotionState {
     apply(player: Phaser.GameObjects.Sprite, uiEmotionImage: Phaser.GameObjects.Image): void;
 }
@@ -103,9 +91,6 @@ export class SuperSadState implements EmotionState {
     }
 }
 
-// ==========================================
-// 4. FACTORY METHOD
-// ==========================================
 export interface NumberItem extends Phaser.GameObjects.Text {
     itemValue: number;
     itemType: string;
@@ -127,9 +112,6 @@ export class ItemFactory {
     }
 }
 
-// ==========================================
-// 5. BUILDER
-// ==========================================
 export class LevelBuilder {
     private scene: Phaser.Scene;
     private platforms: Phaser.Physics.Arcade.StaticGroup;
@@ -172,8 +154,8 @@ export class LevelBuilder {
         const pHeight = texture.height * scale;
         const paddingX = 60;
         const paddingY = 80;
-        const maxJumpDistanceX = 200; // Distancia máxima horizontal segura
-        const maxJumpDistanceY = 160; // Altura máxima vertical segura
+        const maxJumpDistanceX = 200;
+        const maxJumpDistanceY = 160;
 
         const startY = this.boundsHeight - 120;
         const placedPositions: {x: number, y: number}[] = [
@@ -207,7 +189,7 @@ export class LevelBuilder {
 
                         if (distanceX < (pWidth + paddingX) && absoluteDistY < (pHeight + paddingY)) {
                             isOverlapping = true;
-                            break; // Dejamos de revisar, ya sabemos que no cabe
+                            break;
                         }
                         if (distanceX <= maxJumpDistanceX && distanceY <= maxJumpDistanceY) {
                             isReachable = true;
@@ -236,9 +218,6 @@ export class LevelBuilder {
     }
 }
 
-// ==========================================
-// 6. FACADE
-// ==========================================
 export class UIFacade {
     private livesText!: Phaser.GameObjects.Text;
     private coinsText!: Phaser.GameObjects.Text;
@@ -283,18 +262,15 @@ export class UIFacade {
         const playableHeight = gameHeight - barHeight;
         const barCenterY = playableHeight + (barHeight / 2);
 
-        // --- FONDO DE LA BARRA ---
         this.scene.add.image(gameWidth / 2, barCenterY, barBgKey)
             .setDisplaySize(gameWidth, barHeight)
             .setDepth(100);
 
-        // --- AVATAR CENTRAL ---
         this.emotionImage = this.scene.add.image(gameWidth / 2, barCenterY, 'avatar_normal')
             .setOrigin(0.5, 0.5)
             .setScale(3)
             .setDepth(200);
 
-        // --- ESTILO DE TEXTO ---
         const style = {
             fontSize: '20px',
             fill: '#fff',
@@ -304,10 +280,8 @@ export class UIFacade {
             align: 'center'
         };
 
-        // --- POSICIONES X PARA LOS PANELES ---
-        // Centros reales de los recuadros tallados en el asset de la barra
-        // (medidos sobre la imagen: recuadro izquierdo ~22.6% del ancho,
-        // recuadro derecho ~77.3% del ancho).
+        // Centros de los recuadros tallados en el asset de la barra (medidos
+        // sobre la imagen: izquierdo ~22.6% del ancho, derecho ~77.3%).
         const leftPanelX = gameWidth * 0.226;
         const rightPanelX = gameWidth * 0.773;
 
@@ -345,23 +319,21 @@ export class UIFacade {
     public createControlButtons(gameWidth: number) {
         const style = {
             fontSize: '22px',
-            backgroundColor: '#374151', // Gris oscuro para que resalte
+            backgroundColor: '#374151',
             padding: { x: 10, y: 5 },
             color: '#FFF'
         };
 
-        // 1. BOTÓN MUTEAR (Controla el sonido global directamente)
         let isMuted = this.scene.sound.mute;
         const muteBtn = this.scene.add.image(gameWidth - 110, 30, isMuted ? 'mute' : 'sound_on')
             .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(200);
 
         muteBtn.on('pointerdown', () => {
             isMuted = !isMuted;
-            this.scene.sound.mute = isMuted; // Phaser maneja el muteo global automáticamente
+            this.scene.sound.mute = isMuted;
             muteBtn.setTexture(isMuted ? 'mute' : 'sound_on');
         });
 
-        // 2. BOTÓN PAUSA (Avisa a GameScene mediante EventBus)
         let isPaused = false;
         const pauseBtn = this.scene.add.image(gameWidth - 50, 30, isPaused ? 'pause': 'play')
             .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(200);
@@ -375,34 +347,25 @@ export class UIFacade {
 }
 
 export class DifficultyEvaluator {
-    /**
-     * Calcula y retorna el nuevo nivel de dificultad (1, 2 o 3)
-     */
     public static evaluate(currentDifficulty: number, timeSeconds: number, lives: number, isRestart: boolean): number {
         let shift = 0;
         if (currentDifficulty === 4) {
             return 4;
         }
         if (isRestart) {
-            // Disminuye la dificultad si el discente reinicia el nivel (derrota)
             shift = -1;
         } else {
-            // Regla de tiempo y vidas en caso de victoria
             if (timeSeconds >= 120 || lives <= 1) {
-                shift = -1; // Disminuye si tarda > 2 mins o casi pierde
+                shift = -1;
             } else if (timeSeconds <= 30 && lives === 3) {
-                shift = 1;  // Aumenta si es muy rápido (< 30s) y perfecto
+                shift = 1;
             }
         }
 
-        // Phaser.Math.Clamp asegura que el valor nunca baje de 1 ni suba de 3
         return Phaser.Math.Clamp(currentDifficulty + shift, 1, 3);
     }
 }
 
-// ==========================================
-// 7. FACADE - CONTROLES TÁCTILES
-// ==========================================
 export class TouchControls {
     private scene: Phaser.Scene;
     public readonly enabled: boolean;
@@ -419,8 +382,7 @@ export class TouchControls {
 
         const radius = 42;
         const movePadY = playableHeight - 70;
-        // La puerta del nivel vive en la esquina inferior derecha, así que el
-        // clúster de acción se sube para no taparla.
+        // La puerta vive en la esquina inferior derecha; el pad de accion sube para no taparla.
         const actionPadY = playableHeight - 170;
 
         this.createButton(80, movePadY, radius, '◀', '30px',

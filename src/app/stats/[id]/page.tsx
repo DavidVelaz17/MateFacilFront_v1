@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import api from "@/config/api";
 import { useToast } from "@/components/ToastProvider";
 
-import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Loader2, ListChecks, X, Check, Heart, Star, TrendingUp, Flame, Target, Lock } from "lucide-react";
+import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Loader2, ListChecks, X, Check, Heart, Star, TrendingUp, Flame, Target, Lock, Printer } from "lucide-react";
 import {
     ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from "recharts";
@@ -75,6 +75,7 @@ export default function StatsPage() {
             try {
                 const token = localStorage.getItem("token");
                 const response = await api.get(`/discentes/${params.id}/stats`, {
+                    params: { tzOffset: new Date().getTimezoneOffset() },
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
@@ -292,13 +293,21 @@ export default function StatsPage() {
                             Alumno: <span className="text-gray-700 font-bold">{stats.studentName || `#${params.id}`}</span>
                         </p>
                     </div>
-                    <button
-                        onClick={() => setShowProgressModal(true)}
-                        disabled={stats.recentSessions.length === 0}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
-                    >
-                        <TrendingUp size={18} /> Ver avance
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => router.push(`/reporte/alumno/${params.id}`)}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium transition-colors"
+                        >
+                            <Printer size={18} /> Imprimir reporte
+                        </button>
+                        <button
+                            onClick={() => setShowProgressModal(true)}
+                            disabled={stats.recentSessions.length === 0}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
+                        >
+                            <TrendingUp size={18} /> Ver avance
+                        </button>
+                    </div>
                 </header>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">

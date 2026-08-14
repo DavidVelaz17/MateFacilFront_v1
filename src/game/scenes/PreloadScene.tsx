@@ -14,7 +14,6 @@ export class PreloadScene extends Phaser.Scene{
         if (this.game.registry.get('assetsLoaded')) {
             return;
         }
-        //MENU
         this.load.image('main_menu_base', '/assets/MainMenu.png');
         this.load.image('mute', '/assets/mute.png');
         this.load.image('sound_on', '/assets/sound_on.png');
@@ -33,18 +32,14 @@ export class PreloadScene extends Phaser.Scene{
         this.load.image('btn_mapa_0', '/assets/btn_mapa_0.png');
         this.load.image('btn_mapa_1', '/assets/btn_mapa_1.png');
 
-        //MAPAS
         this.load.image('mapa_agua', '/assets/mapa_agua.png');
         this.load.image('mapa_tierra', '/assets/mapa_tierra.png');
 
-        //FONDOS
         this.load.image('bg_agua', '/assets/bg_agua.png');
         this.load.image('bg_tierra', '/assets/bg_tierra.jpg');
-        //FONDOS CON TUTORIAL PARA PC
         this.load.image('bg_tierra_tutorial', '/assets/bg_tierra_tutorial.jpeg');
         this.load.image('bg_agua_tutorial', '/assets/bg_agua_tutorial.jpeg');
 
-        //ELEMENTOS DEL MAPA
         this.load.image('platform_tierra', '/assets/platform_tierra.png');
         this.load.image('platform_agua', '/assets/platform_agua.png');
         this.load.image('door', '/assets/door.png');
@@ -52,62 +47,47 @@ export class PreloadScene extends Phaser.Scene{
         this.load.image('bar_bg_tierra', '/assets/bar_background_tierra.png');
         this.load.image('bar_bg_agua', '/assets/bar_background_agua.png');
 
-        //PERSONAJE
         this.load.image('axolotl', '/assets/axolote_standing.png');
         this.load.spritesheet('axolotl_idle', '/assets/axolote_idle32x32.png', { frameWidth: 32, frameHeight: 32 });
         this.load.spritesheet('axolotl_walking', '/assets/axolote_walking32x32.png', { frameWidth: 32, frameHeight: 32 });
 
-        //PERSONAJES EN NARRATIVA TERRESTRE
         this.load.image('leon', '/assets/leon.png');
         this.load.image('mono', '/assets/mono.png');
         this.load.image('jirafa', '/assets/jirafa.png');
         this.load.image('zebra', '/assets/zeb.png');
         this.load.image('ajolote', '/assets/ajolote.png');
 
-        //PERSONAJES EN NARRATIVA MARINA
         this.load.image('cocodrilo', '/assets/coco.png');
         this.load.image('delfin', '/assets/delfin.png');
         this.load.image('hipo', '/assets/hipo.png');
         this.load.image('pingu', '/assets/pingui.png');
 
-        //AVATAR
         this.load.image('avatar_normal', '/assets/avatar_normal.png');
         this.load.image('avatar_supersad', '/assets/avatar_muytriste.png');
         this.load.image('avatar_superhappy', '/assets/avatar_muyfeliz.png');
         this.load.image('avatar_sad', '/assets/avatar_triste.png');
         this.load.image('avatar_happy', '/assets/avatar_feliz.png');
 
-        //SONIDOS DE FONDO
         this.load.audio('bg_music', '/assets/bg_sound.mp3');
         this.load.audio('bg_map', '/assets/bg_map.mp3');
         this.load.audio('fanfare', '/assets/fanfare_1.mp3');
 
-        //VOCES DE PERSONAJES
-        //LEON
         this.load.audio('leonVoiceInit', '/assets/LeonVoiceInit.mp3');
         this.load.audio('leonVoiceEnd', '/assets/LeonVoiceEnd.mp3');
-        //MONO
         this.load.audio('monkyVoiceInit', '/assets/MonkyVoiceInit.mp3');
         this.load.audio('monkyVoiceEnd', '/assets/MonkyVoiceEnd.mp3');
-        //JIRAFA
         this.load.audio('jirafVoiceInit', '/assets/JirafVoiceInit.mp3');
         this.load.audio('jirafVoiceEnd', '/assets/JirafVoiceEnd.mp3');
-        //ZEBRA
         this.load.audio('zebVoiceInit', '/assets/ZebVoiceInit.mp3');
         this.load.audio('zebVoiceEnd', '/assets/ZebVoiceEnd.mp3');
-        //AJOLOTE
         this.load.audio('axolotVoiceInit', '/assets/AxolotVoiceInit.mp3');
         this.load.audio('axolotVoiceEnd', '/assets/AxolotVoiceEnd.mp3');
-        //COCODRILO
         this.load.audio('cocoVoiceInit', '/assets/CocoVoiceInit.mp3');
         this.load.audio('cocoVoiceEnd', '/assets/CocoVoiceEnd.mp3');
-        //DELFIN
         this.load.audio('dolphVoiceInit', '/assets/DolphVoiceInit.mp3');
         this.load.audio('dolphVoiceEnd', '/assets/DolphVoiceEnd.mp3');
-        //HIPO
         this.load.audio('hipoVoiceInit', '/assets/HipoVoiceInit.mp3');
         this.load.audio('hipoVoiceEnd', '/assets/HipoVoiceEnd.mp3');
-        //PINGU
         this.load.audio('pinguVoiceInit', '/assets/PinguVoiceInit.mp3');
         this.load.audio('pinguVoiceEnd', '/assets/PinguVoiceEnd.mp3');
 
