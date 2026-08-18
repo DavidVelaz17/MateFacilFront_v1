@@ -7,7 +7,7 @@ import {
     ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
     ScatterChart, Scatter, ReferenceLine
 } from "recharts";
-import { ArrowLeft, Printer, Loader2, Flame, Target } from "lucide-react";
+import { ArrowLeft, Printer, Loader2 } from "lucide-react";
 
 type Rango = "hoy" | "semana" | "mes" | "personalizado";
 
@@ -172,7 +172,7 @@ export default function ReporteGrupoPage() {
                                 key={r}
                                 onClick={() => setRango(r)}
                                 className={`px-3 py-2 text-sm font-medium transition-colors ${
-                                    rango === r ? "bg-purple-600 text-white" : "text-gray-600 hover:bg-gray-100"
+                                    rango === r ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100"
                                 }`}
                             >
                                 {RANGO_LABEL[r]}
@@ -201,7 +201,7 @@ export default function ReporteGrupoPage() {
                     )}
                     <button
                         onClick={() => window.print()}
-                        className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium"
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
                     >
                         <Printer size={18} /> Imprimir
                     </button>
@@ -213,7 +213,7 @@ export default function ReporteGrupoPage() {
             ) : (
                 <div className="max-w-4xl mx-auto bg-white print:shadow-none shadow-sm border border-gray-200 print:border-0 rounded-xl p-8 print:p-0">
                     <header className="mb-8 pb-6 border-b border-gray-200">
-                        <p className="text-xs font-bold uppercase tracking-wide text-purple-600 mb-1">MateFácil · Reporte de Grupo</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-1">MateFácil · Reporte de Grupo</p>
                         <h1 className="text-2xl font-bold text-gray-900">{data.groupName}</h1>
                         <p className="text-sm text-gray-500 mt-1">
                             {data.docenteName ? `Docente: ${data.docenteName} · ` : ''}Periodo: {RANGO_LABEL[rango]} ({rangoLabel})
@@ -333,12 +333,12 @@ export default function ReporteGrupoPage() {
                                         <td className="px-3 py-2">{s.avgPuntosPeriodo ?? '—'}</td>
                                         <td className="px-3 py-2">
                                             {s.rachaDias >= 2 ? (
-                                                <span className="inline-flex items-center gap-1"><Flame size={12} className="text-orange-500" /> {s.rachaDias}</span>
+                                                <span className="inline-flex items-center gap-1"><img src="/assets/fire_Icon.png" alt="" className="w-3 h-3" /> {s.rachaDias}</span>
                                             ) : '—'}
                                         </td>
                                         <td className="px-3 py-2">
                                             {s.rachaVictorias >= 2 ? (
-                                                <span className="inline-flex items-center gap-1"><Target size={12} className="text-purple-600" /> {s.rachaVictorias}</span>
+                                                <span className="inline-flex items-center gap-1"><img src="/assets/target_Icon.png" alt="" className="w-3 h-3" /> {s.rachaVictorias}</span>
                                             ) : '—'}
                                         </td>
                                     </tr>

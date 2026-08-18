@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { EventBus } from './patterns';
+import { ACHIEVEMENT_NAME_OVERRIDES, ACHIEVEMENT_TEXTURE_KEYS } from '@/config/achievementIcons';
 
 interface LogroDesbloqueado {
     codigo: string;
@@ -21,6 +22,7 @@ interface RachaData {
 export class NotificationScene extends Phaser.Scene {
     private streakText: Phaser.GameObjects.Text | null = null;
     private streakBg: Phaser.GameObjects.Rectangle | null = null;
+    private streakIcon: Phaser.GameObjects.Image | null = null;
     private streakTimer: Phaser.Time.TimerEvent | null = null;
 
     private logroQueue: LogroDesbloqueado[] = [];
@@ -58,22 +60,28 @@ export class NotificationScene extends Phaser.Scene {
         this.scene.bringToTop();
         this.hideStreak();
 
+        const iconKey = mostrarDias ? 'icono_fuego' : 'icono_objetivo';
+        const iconSize = 16;
         const texto = mostrarDias
-            ? `🔥 Racha de ${data.dias} días`
-            : `🎯 ${data.victorias} victorias seguidas`;
+            ? `Racha de ${data.dias} días`
+            : `${data.victorias} victorias seguidas`;
 
         const label = this.add.text(0, 0, texto, {
             fontSize: '14px',
             color: '#fde68a',
             fontStyle: 'bold',
         });
-        const width = label.width + 24;
+        const width = label.width + 24 + iconSize + 6;
 
         this.streakBg = this.add.rectangle(
             this.MARGIN_X, this.MARGIN_Y, width, this.STREAK_HEIGHT, 0x111827, 0.88,
         ).setOrigin(0, 0).setStrokeStyle(1, 0xfb923c, 0.6).setDepth(100);
 
-        label.setPosition(this.MARGIN_X + 12, this.MARGIN_Y + this.STREAK_HEIGHT / 2);
+        this.streakIcon = this.add.image(
+            this.MARGIN_X + 12, this.MARGIN_Y + this.STREAK_HEIGHT / 2, iconKey,
+        ).setDisplaySize(iconSize, iconSize).setOrigin(0, 0.5).setDepth(101);
+
+        label.setPosition(this.MARGIN_X + 12 + iconSize + 6, this.MARGIN_Y + this.STREAK_HEIGHT / 2);
         label.setOrigin(0, 0.5).setDepth(101);
         this.streakText = label;
 
@@ -84,8 +92,10 @@ export class NotificationScene extends Phaser.Scene {
         this.streakTimer?.remove();
         this.streakText?.destroy();
         this.streakBg?.destroy();
+        this.streakIcon?.destroy();
         this.streakText = null;
         this.streakBg = null;
+        this.streakIcon = null;
     }
 
     private handleLogrosUnlocked = (logros: LogroDesbloqueado[]) => {
@@ -112,8 +122,11 @@ export class NotificationScene extends Phaser.Scene {
         const eyebrow = this.add.text(10, 6, 'NUEVO LOGRO', {
             fontSize: '9px', color: '#c4b5fd', fontStyle: 'bold',
         });
-        const icon = this.add.text(10, 22, logro.icono, { fontSize: '22px' });
-        const nombre = this.add.text(42, 20, logro.nombre, {
+        const textureKey = ACHIEVEMENT_TEXTURE_KEYS[logro.codigo];
+        const icon = textureKey
+            ? this.add.image(10, 22, textureKey).setDisplaySize(22, 22).setOrigin(0, 0)
+            : this.add.text(10, 22, logro.icono, { fontSize: '22px' });
+        const nombre = this.add.text(42, 20, ACHIEVEMENT_NAME_OVERRIDES[logro.codigo] ?? logro.nombre, {
             fontSize: '13px', color: '#ffffff', fontStyle: 'bold',
         });
         const desc = this.add.text(42, 38, logro.descripcion, {

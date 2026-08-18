@@ -91,6 +91,20 @@ export class PreloadScene extends Phaser.Scene{
         this.load.audio('pinguVoiceInit', '/assets/PinguVoiceInit.mp3');
         this.load.audio('pinguVoiceEnd', '/assets/PinguVoiceEnd.mp3');
 
+        this.load.image('icono_tierra','/assets/dirt_Icon.png');
+        this.load.image('icono_fuego','/assets/fire_Icon.png');
+        this.load.image('icono_cohete','/assets/launcher_Icon.png');
+        this.load.image('icono_rayo','/assets/lightning_Icon.png');
+        this.load.image('icono_pausa','/assets/pause_Icon.png');
+        this.load.image('icono_segundaOportunidad','/assets/seconOportunity_Icon.png');
+        this.load.image('icono_escudo','/assets/shield_Icon.png');
+        this.load.image('icono_fuerte','/assets/strong_Icon.png');
+        this.load.image('icono_cirujano','/assets/surgeon_Icon.png');
+        this.load.image('icono_objetivo','/assets/target_Icon.png');
+        this.load.image('icono_agua','/assets/water_Icon.png');
+        this.load.image('icono_zombie','/assets/zombie_Icon.png');
+        this.load.image('icono_perfecto','/assets/perfect_Icon.png');
+
         this.load.on('loaderror', (fileObj: any) => {
             console.error("Fallo al cargar:", fileObj.src);
         });

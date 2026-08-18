@@ -6,7 +6,8 @@ import { useToast } from "@/components/ToastProvider";
 import {
     ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from "recharts";
-import { ArrowLeft, Printer, Loader2, Flame, Target } from "lucide-react";
+import { ArrowLeft, Printer, Loader2 } from "lucide-react";
+import { ACHIEVEMENT_ICONS, ACHIEVEMENT_NAME_OVERRIDES } from "@/config/achievementIcons";
 
 type Rango = "hoy" | "semana" | "mes" | "personalizado";
 
@@ -157,7 +158,7 @@ export default function ReporteAlumnoPage() {
                                 key={r}
                                 onClick={() => setRango(r)}
                                 className={`px-3 py-2 text-sm font-medium transition-colors ${
-                                    rango === r ? "bg-purple-600 text-white" : "text-gray-600 hover:bg-gray-100"
+                                    rango === r ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100"
                                 }`}
                             >
                                 {RANGO_LABEL[r]}
@@ -186,7 +187,7 @@ export default function ReporteAlumnoPage() {
                     )}
                     <button
                         onClick={() => window.print()}
-                        className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium"
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
                     >
                         <Printer size={18} /> Imprimir
                     </button>
@@ -198,7 +199,7 @@ export default function ReporteAlumnoPage() {
             ) : (
                 <div className="max-w-4xl mx-auto bg-white print:shadow-none shadow-sm border border-gray-200 print:border-0 rounded-xl p-8 print:p-0">
                     <header className="mb-8 pb-6 border-b border-gray-200">
-                        <p className="text-xs font-bold uppercase tracking-wide text-purple-600 mb-1">MateFácil · Reporte de Desempeño</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-1">MateFácil · Reporte de Desempeño</p>
                         <h1 className="text-2xl font-bold text-gray-900">{data.studentName}</h1>
                         <p className="text-sm text-gray-500 mt-1">
                             {data.grupos.join(', ') || 'Sin grupo asignado'} · Periodo: {RANGO_LABEL[rango]} ({rangoLabel})
@@ -240,19 +241,19 @@ export default function ReporteAlumnoPage() {
                         <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">Estado actual</h2>
                         <div className="grid grid-cols-5 gap-4">
                             <div className="border border-gray-200 rounded-lg p-3 text-center">
-                                <p className="text-xl font-bold text-gray-800 flex items-center justify-center gap-1"><Flame size={16} className="text-orange-500" /> {data.estadoActual.streaks.dias}</p>
+                                <p className="text-xl font-bold text-gray-800 flex items-center justify-center gap-1"><img src="/assets/fire_Icon.png" alt="" className="w-4 h-4" /> {data.estadoActual.streaks.dias}</p>
                                 <p className="text-[10px] text-gray-500 uppercase">Racha días</p>
                             </div>
                             <div className="border border-gray-200 rounded-lg p-3 text-center">
-                                <p className="text-xl font-bold text-gray-800 flex items-center justify-center gap-1"><Target size={16} className="text-purple-600" /> {data.estadoActual.streaks.victorias}</p>
+                                <p className="text-xl font-bold text-gray-800 flex items-center justify-center gap-1"><img src="/assets/target_Icon.png" alt="" className="w-4 h-4" /> {data.estadoActual.streaks.victorias}</p>
                                 <p className="text-[10px] text-gray-500 uppercase">Racha victorias</p>
                             </div>
                             <div className="border border-gray-200 rounded-lg p-3 text-center">
-                                <p className="text-xl font-bold text-gray-800">🌎 {data.estadoActual.nivelMapaTierra}/5</p>
+                                <p className="text-xl font-bold text-gray-800 flex items-center justify-center gap-1"><img src="/assets/dirt_Icon.png" alt="" className="w-4 h-4" /> {data.estadoActual.nivelMapaTierra}/5</p>
                                 <p className="text-[10px] text-gray-500 uppercase">Mundo Terrestre</p>
                             </div>
                             <div className="border border-gray-200 rounded-lg p-3 text-center">
-                                <p className="text-xl font-bold text-gray-800">🌊 {data.estadoActual.nivelMapaAgua}/5</p>
+                                <p className="text-xl font-bold text-gray-800 flex items-center justify-center gap-1"><img src="/assets/water_Icon.png" alt="" className="w-4 h-4" /> {data.estadoActual.nivelMapaAgua}/5</p>
                                 <p className="text-[10px] text-gray-500 uppercase">Mundo Acuático</p>
                             </div>
                             <div className="border border-gray-200 rounded-lg p-3 text-center">
@@ -266,11 +267,20 @@ export default function ReporteAlumnoPage() {
                         <section className="mb-8 break-inside-avoid">
                             <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">Logros obtenidos en este periodo</h2>
                             <div className="flex flex-wrap gap-2">
-                                {data.logrosEnPeriodo.map((l) => (
-                                    <span key={l.codigo} className="inline-flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-full px-3 py-1.5 text-xs font-semibold text-purple-800">
-                                        <span className="text-base">{l.icono}</span> {l.nombre}
-                                    </span>
-                                ))}
+                                {data.logrosEnPeriodo.map((l) => {
+                                    const iconSrc = ACHIEVEMENT_ICONS[l.codigo];
+                                    const nombre = ACHIEVEMENT_NAME_OVERRIDES[l.codigo] ?? l.nombre;
+                                    return (
+                                        <span key={l.codigo} className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-3 py-1.5 text-xs font-semibold text-blue-800">
+                                            {iconSrc ? (
+                                                <img src={iconSrc} alt="" className="w-4 h-4" />
+                                            ) : (
+                                                <span className="text-base">{l.icono}</span>
+                                            )}
+                                            {nombre}
+                                        </span>
+                                    );
+                                })}
                             </div>
                         </section>
                     )}
@@ -316,7 +326,7 @@ export default function ReporteAlumnoPage() {
                                             <td className="px-3 py-2">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-purple-500" style={{ width: `${d.porcentaje}%` }} />
+                                                        <div className="h-full bg-blue-500" style={{ width: `${d.porcentaje}%` }} />
                                                     </div>
                                                     <span className="text-xs text-gray-500">{d.porcentaje}%</span>
                                                 </div>

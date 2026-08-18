@@ -155,7 +155,7 @@ export default function PlayPage() {
                 <h1 className="text-lg sm:text-xl font-bold">MateFácil - Zona de Juego</h1>
                 <button
                     onClick={() => window.history.back()}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition self-start sm:self-auto"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition self-start sm:self-auto"
                 >
                     Volver al Panel
                 </button>

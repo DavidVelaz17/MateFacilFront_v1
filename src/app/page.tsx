@@ -17,6 +17,9 @@ export default function Login() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [bgImage] = useState(() =>
+        Math.random() < 0.5 ? "/assets/bg_tierra.jpg" : "/assets/bg_agua.png"
+    );
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -58,8 +61,12 @@ export default function Login() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4">
-            <form onSubmit={handleLogin} className="w-full max-w-sm bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+        <div
+            className="relative flex min-h-screen items-center justify-center bg-gray-100 bg-cover bg-center px-4"
+            style={{ backgroundImage: `url(${bgImage})` }}
+        >
+            <div className="absolute inset-0 bg-black/40" />
+            <form onSubmit={handleLogin} className="relative z-10 w-full max-w-sm bg-white p-8 rounded-xl shadow-lg border border-gray-200">
                 <h1 className="text-2xl font-bold mb-2 text-center text-blue-600">MateFácil</h1>
 
                 {error && (

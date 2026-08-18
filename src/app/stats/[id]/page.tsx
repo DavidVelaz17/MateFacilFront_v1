@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import api from "@/config/api";
 import { useToast } from "@/components/ToastProvider";
 
-import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Loader2, ListChecks, X, Check, Heart, Star, TrendingUp, Flame, Target, Lock, Printer } from "lucide-react";
+import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Loader2, ListChecks, X, Check, Heart, Star, TrendingUp, Lock, Printer } from "lucide-react";
 import {
     ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from "recharts";
+import { ACHIEVEMENT_ICONS, ACHIEVEMENT_NAME_OVERRIDES } from "@/config/achievementIcons";
 
 interface DesgloseEvento {
     orden: number;
@@ -166,7 +167,7 @@ export default function StatsPage() {
             "Difícil": "bg-red-500",
             "Media": "bg-yellow-500",
             "Fácil": "bg-green-500",
-            "Custom": "bg-purple-600",
+            "Custom": "bg-blue-600",
         };
 
         const styles = colorMap[level] || "bg-gray-500";
@@ -181,7 +182,7 @@ export default function StatsPage() {
         const colorMap: Record<string, string> = {
             "Suma": "bg-blue-100 text-blue-700",
             "Resta": "bg-orange-100 text-orange-700",
-            "Multiplicación": "bg-purple-100 text-purple-700",
+            "Multiplicación": "bg-cyan-100 text-cyan-700",
             "División": "bg-pink-100 text-pink-700",
         };
 
@@ -292,14 +293,14 @@ export default function StatsPage() {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => router.push(`/reporte/alumno/${params.id}`)}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium transition-colors"
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 font-medium transition-colors"
                         >
                             <Printer size={18} /> Imprimir reporte
                         </button>
                         <button
                             onClick={() => setShowProgressModal(true)}
                             disabled={stats.recentSessions.length === 0}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
                         >
                             <TrendingUp size={18} /> Ver avance
                         </button>
@@ -358,8 +359,8 @@ export default function StatsPage() {
                     <div className="mb-10">
                         <div className="flex flex-wrap gap-4 mb-6">
                             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 flex-1 min-w-[200px]">
-                                <div className="p-3 bg-orange-50 rounded-lg text-orange-500 shrink-0">
-                                    <Flame size={22} />
+                                <div className="p-3 bg-orange-50 rounded-lg text-orange-500 shrink-0 w-11 h-11 flex items-center justify-center">
+                                    <img src="/assets/fire_Icon.png" alt="" className="w-6 h-6" />
                                 </div>
                                 <div>
                                     <h3 className="text-2xl font-bold text-gray-800">{stats.streaks.dias} {stats.streaks.dias === 1 ? 'día' : 'días'}</h3>
@@ -367,8 +368,8 @@ export default function StatsPage() {
                                 </div>
                             </div>
                             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 flex-1 min-w-[200px]">
-                                <div className="p-3 bg-purple-50 rounded-lg text-purple-600 shrink-0">
-                                    <Target size={22} />
+                                <div className="p-3 bg-blue-50 rounded-lg text-blue-600 shrink-0 w-11 h-11 flex items-center justify-center">
+                                    <img src="/assets/target_Icon.png" alt="" className="w-6 h-6" />
                                 </div>
                                 <div>
                                     <h3 className="text-2xl font-bold text-gray-800">{stats.streaks.victorias} {stats.streaks.victorias === 1 ? 'partida' : 'partidas'}</h3>
@@ -393,31 +394,42 @@ export default function StatsPage() {
                             </button>
                             {showLogros && (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
-                                    {stats.logros.map((logro) => (
+                                    {stats.logros.map((logro) => {
+                                        const iconSrc = ACHIEVEMENT_ICONS[logro.codigo];
+                                        const nombre = ACHIEVEMENT_NAME_OVERRIDES[logro.codigo] ?? logro.nombre;
+                                        return (
                                         <div
                                             key={logro.codigo}
                                             className={`rounded-lg p-3 text-center border flex flex-col items-center gap-1.5 ${
-                                                logro.desbloqueado ? "bg-purple-50 border-purple-200" : "bg-gray-50 border-gray-200"
+                                                logro.desbloqueado ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-200"
                                             }`}
                                         >
-                                            <span className={`text-2xl leading-none ${logro.desbloqueado ? "" : "grayscale opacity-40"}`}>
-                                                {logro.icono}
-                                            </span>
+                                            {iconSrc ? (
+                                                <img
+                                                    src={iconSrc}
+                                                    alt=""
+                                                    className={`w-7 h-7 ${logro.desbloqueado ? "" : "grayscale opacity-40"}`}
+                                                />
+                                            ) : (
+                                                <span className={`text-2xl leading-none ${logro.desbloqueado ? "" : "grayscale opacity-40"}`}>
+                                                    {logro.icono}
+                                                </span>
+                                            )}
                                             <span className={`text-xs font-bold ${logro.desbloqueado ? "text-gray-800" : "text-gray-400"}`}>
-                                                {logro.nombre}
+                                                {nombre}
                                             </span>
                                             <span className="text-[10.5px] text-gray-500 leading-tight min-h-[26px]">
                                                 {logro.descripcion}
                                             </span>
                                             {logro.desbloqueado ? (
-                                                <span className="text-[10px] font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+                                                <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
                                                     {new Date(logro.fecha as string).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
                                                 </span>
                                             ) : logro.progreso ? (
                                                 <div className="w-full">
                                                     <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
                                                         <div
-                                                            className="h-full bg-purple-300 rounded-full"
+                                                            className="h-full bg-blue-300 rounded-full"
                                                             style={{ width: `${Math.min(100, (logro.progreso.actual / logro.progreso.total) * 100)}%` }}
                                                         />
                                                     </div>
@@ -427,7 +439,8 @@ export default function StatsPage() {
                                                 <Lock size={12} className="text-gray-300" />
                                             )}
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -484,7 +497,7 @@ export default function StatsPage() {
                                         <button
                                             onClick={() => setSelectedSession(session)}
                                             title="Ver desglose de la partida"
-                                            className="inline-flex items-center justify-center p-2 rounded-lg text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors"
+                                            className="inline-flex items-center justify-center p-2 rounded-lg text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
                                         >
                                             <ListChecks size={18} />
                                         </button>

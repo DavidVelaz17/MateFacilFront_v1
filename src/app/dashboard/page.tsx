@@ -523,13 +523,13 @@ export default function Dashboard() {
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => router.push(`/reporte/grupo/${activeGroupId}`)}
-                                    className="flex items-center justify-center gap-2 bg-white text-purple-700 border border-purple-200 px-5 py-2.5 rounded-lg hover:bg-purple-50 transition font-medium shrink-0"
+                                    className="flex items-center justify-center gap-2 bg-white text-blue-700 border border-blue-200 px-5 py-2.5 rounded-lg hover:bg-blue-50 transition font-medium shrink-0"
                                 >
                                     <Printer size={20} /> Imprimir reporte
                                 </button>
                                 <button
                                     onClick={handleOpenGroupProgress}
-                                    className="flex items-center justify-center gap-2 bg-white text-purple-700 border border-purple-200 px-5 py-2.5 rounded-lg hover:bg-purple-50 transition font-medium shrink-0"
+                                    className="flex items-center justify-center gap-2 bg-white text-blue-700 border border-blue-200 px-5 py-2.5 rounded-lg hover:bg-blue-50 transition font-medium shrink-0"
                                 >
                                     <TrendingUp size={20} /> Ver avance del grupo
                                 </button>
@@ -584,7 +584,7 @@ export default function Dashboard() {
                                                             setGameConfig({ mode: null, type: null, element: null, operation: 'suma', timeLimit: '', numCifras: 2, cifras: ['', ''], resultado: '', numTrampas: 1, trampas: [''] });
                                                             setIsPlayModalOpen(true);
                                                         }}
-                                                        color="text-purple-500"
+                                                        color="text-emerald-600"
                                                     />
                                                     <IconButton icon={<BarChart2 size={18} />} label="Estadísticas" onClick={() => router.push(`/stats/${student.id_discente}`)} color="text-yellow-600" />
                                                 </div>
@@ -791,7 +791,7 @@ export default function Dashboard() {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl relative overflow-hidden ring-1 ring-gray-200 flex flex-col max-h-[90vh]">
 
-                        <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 border-b border-gray-100 flex justify-between items-center text-white shrink-0">
+                        <div className="bg-blue-600 px-6 py-4 border-b border-gray-100 flex justify-between items-center text-white shrink-0">
                             <div>
                                 <h2 className="text-xl font-bold">Configurar Partida</h2>
                                 <p className="text-sm opacity-90">Alumno: {selectedStudentForPlay.Nombre_Discente}</p>
@@ -812,9 +812,9 @@ export default function Dashboard() {
                                                 setIsPlayModalOpen(false);
                                                 router.push(`/play/${selectedStudentForPlay.id_discente}?mode=historia`);
                                             }}
-                                            className="p-6 border-2 border-purple-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all group"
+                                            className="p-6 border-2 border-amber-200 rounded-xl hover:border-amber-500 hover:bg-amber-50 transition-all group"
                                         >
-                                            <BookOpen size={40} className="mx-auto text-purple-400 group-hover:text-purple-600 mb-3" />
+                                            <BookOpen size={40} className="mx-auto text-amber-400 group-hover:text-amber-600 mb-3" />
                                             <span className="block font-bold text-gray-800 text-lg">Modo Historia</span>
                                             <span className="text-sm text-gray-500 mt-2 block">Campaña predeterminada</span>
                                         </button>
@@ -1017,7 +1017,7 @@ export default function Dashboard() {
 
                                     <div className="flex justify-between mt-8 pt-4 border-t border-gray-100 shrink-0">
                                         <button type="button" onClick={() => setPlayStep(2)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium">Atrás</button>
-                                        <button type="submit" className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-lg hover:shadow-lg hover:scale-105 transition-all flex items-center gap-2">
+                                        <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 hover:shadow-lg hover:scale-105 transition-all flex items-center gap-2">
                                             <Play size={18} fill="currentColor" /> Iniciar Partida
                                         </button>
                                     </div>
