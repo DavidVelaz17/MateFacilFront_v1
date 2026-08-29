@@ -4,7 +4,6 @@ import { useState } from "react";
 import api from "@/config/api";
 import { jwtDecode } from "jwt-decode";
 
-// Interfaz para saber que trae el token
 interface CustomJwtPayload {
     sub: number;
     username: string;
@@ -15,11 +14,12 @@ interface CustomJwtPayload {
 export default function Login() {
     const router = useRouter();
     const [username, setUsername] = useState("");
-    // Agregamos el estado para controlar la contrasena
     const [password, setPassword] = useState("");
-    // Estados para manejar errores de UI y carga
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [bgImage] = useState(() =>
+        Math.random() < 0.5 ? "/assets/bg_tierra.jpg" : "/assets/bg_agua.png"
+    );
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -27,23 +27,18 @@ export default function Login() {
         setIsLoading(true);
 
         try {
-            // Peticion real a tu backend en NestJS
             const response = await api.post("/auth/login", {
                 usuario: username,
                 password: password
             });
 
-            // Extraemos el token devuelto
             const token = response.data?.access_token;
 
             if (token) {
-                // Guardamos el token en el navegador
                 localStorage.setItem("token", token);
 
-                // Decodificamos para saber si es admin o docente
                 const decoded = jwtDecode<CustomJwtPayload>(token);
 
-                // Enrutamiento seguro basado en la base de datos
                 if (decoded.role === "admin") {
                     router.push("/admin");
                 } else {
@@ -54,13 +49,11 @@ export default function Login() {
             }
         } catch (err: any) {
             console.error("Error al iniciar sesion:", err);
-            // Manejo de errores de credenciales (401) o de servidor caido
             if (err.response?.status === 401) {
                 setError("Usuario o contraseña incorrectos");
             } else {
                 setError("Error al conectar con el servidor local");
             }
-            // Limpieza en caso de fallo
             localStorage.removeItem("token");
         } finally {
             setIsLoading(false);
@@ -68,11 +61,14 @@ export default function Login() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4">
-            <form onSubmit={handleLogin} className="w-full max-w-sm bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+        <div
+            className="relative flex min-h-screen items-center justify-center bg-gray-100 bg-cover bg-center px-4"
+            style={{ backgroundImage: `url(${bgImage})` }}
+        >
+            <div className="absolute inset-0 bg-black/40" />
+            <form onSubmit={handleLogin} className="relative z-10 w-full max-w-sm bg-white p-8 rounded-xl shadow-lg border border-gray-200">
                 <h1 className="text-2xl font-bold mb-2 text-center text-blue-600">MateFácil</h1>
 
-                {/* Bloque para mostrar errores visuales si falla el login */}
                 {error && (
                     <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center border border-red-200">
                         {error}

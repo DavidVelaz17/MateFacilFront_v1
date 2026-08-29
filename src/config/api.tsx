@@ -1,11 +1,7 @@
 import axios from "axios";
 
-// NEXT_PUBLIC_API_URL (si esta definido) se incrusta en el bundle en build
-// time y siempre gana: sirve para forzar un backend fijo (ej. produccion
-// con dominio/HTTPS). Si no esta definido, resolvemos el backend en tiempo
-// de ejecucion usando el mismo host con el que el navegador ya cargo el
-// frontend (window.location.hostname). Asi funciona sin reconstruir sin
-// importar la red/IP LAN desde la que se acceda.
+// Sin NEXT_PUBLIC_API_URL, se resuelve el host en runtime via
+// window.location.hostname para funcionar en cualquier IP de LAN sin rebuild.
 const resolveBaseURL = (): string | undefined => {
     if (process.env.NEXT_PUBLIC_API_URL) {
         return process.env.NEXT_PUBLIC_API_URL;
@@ -37,9 +33,8 @@ api.interceptors.request.use(
     }
 );
 
-// Si el token expiro o es invalido, el backend responde 401 en cualquier
-// endpoint protegido: limpiamos la sesion y regresamos al login en vez de
-// dejar que cada pantalla falle en silencio.
+// 401 en cualquier endpoint = token invalido/expirado: limpiamos sesion y
+// redirigimos al login en vez de que cada pantalla falle en silencio.
 api.interceptors.response.use(
     (response) => response,
     (error) => {

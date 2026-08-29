@@ -20,17 +20,17 @@ export const LevelsTierra: LevelConfig[] = [
         operation: 'suma',
         type: 'repaso',
         bgKey: 'leon',
-        introText: 'Hola Arquímedes ' +
+        introText: 'Hola, Arquímedes ' +
             'quiero ser el rey león y para ello necesito la mejor melena, ' +
             'por favor ayúdame a contar los pelos en mi melena para saber si puedo ganarle a los demás.',
-        successText: 'Woooow no sabía que tenía tantos, ' +
+        successText: 'Woooow! no sabía que tenía tantos, ' +
             'muchas gracias por la ayuda, que te vaya bien en tu travesía.',
     },
     {
         operation: 'suma',
         type: 'repaso',
         bgKey: 'mono',
-        introText: 'Bienvenido a mi habitad Arquímedes, toma una banana. ' +
+        introText: 'Bienvenido a mi hábitat, Arquímedes, toma una banana. ' +
             'Ayúdame a contar las bananas de las pencas que tengo aquí por favor. ' +
             'De esta manera sabré si le puedo convidar a todos mis amigos.',
         successText: 'Perfecto, si me alcanzan las bananas para mis amigos, ' +
@@ -40,33 +40,33 @@ export const LevelsTierra: LevelConfig[] = [
         operation: 'resta',
         type: 'repaso',
         bgKey: 'jirafa',
-        introText: 'Holaaa mchooo gustooo, ' +
-            'quieres que te baje una hojita de Acaciaaa? ' +
-            'Aquí esta tu hojita de acacia, saben muy ricas y son muy nutritivas. ' +
+        introText: '¡Holaaa muchooo gustooo!, ' +
+            '¿Quieres que te baje una hojita de Acacia? ' +
+            'Aquí está tu hojita de acacia, saben muy ricas y son muy nutritivas. ' +
             '¿Me podrías ayudar a contar las manchas que tengo en el cuello, ' +
             'pero sin contar las que están en mi cuerpo por favor?',
-        successText: 'Muuuchaaas graaaciaaas, ' +
-            'eres bienvenido en mi habitad cuando quieras otra hojita de acacia. ' +
+        successText: '¡Muuuchaaas graaaciaaas!, ' +
+            'eres bienvenido en mi hábitat cuando quieras otra hojita de acacia. ' +
             'Cada vez estás más cerca de tu casa, vas por buen camino.',
     },
     {
         operation: 'resta',
         type: 'repaso',
         bgKey: 'zebra',
-        introText: 'Bienvenido a mi reino, tiene mucho que no veo a alguien por aquí. ' +
+        introText: 'Bienvenido, hace mucho que no veo a alguien por aquí. ' +
             'Verás, quiero que cuentes las rayas de mi cuerpo, pero no las rayas de mi cabeza ' +
             'para saber si soy una cebra negra con rayas blancas o una cebra blanca con rayas negras. ' +
             'Sé que puedes hacerlo con facilidad.',
         successText: 'Muchas gracias compadre, ' +
-            'que alivio que soy diferente al resto de cebras. ' +
-            'Visítame pronto vecino. ',
+            '¿Qué alivio que soy diferente al resto de cebras! ' +
+            'Visítame pronto, vecino. ',
     },
     {
         operation: 'resta',
         timeLimit: 120,
         type: 'prueba',
         bgKey: 'ajolote',
-        introText: 'Arquímedes, que bien que encontraste el camino de vuelta a casa. ' +
+        introText: 'Arquímedes, !Qué bien que encontraste el camino de vuelta a casa! ' +
             'Antes de pasar, necesito que me des la contraseña, podrías ser un impostor. ' +
             'Tienes un tiempo límite de 2 minutos.',
         successText: 'Adelante Arquímedes, has pasado la prueba de autenticidad.',
@@ -78,9 +78,9 @@ export const LevelsAgua: LevelConfig[] = [
         operation: 'multiplicacion',
         type: 'repaso',
         bgKey: 'cocodrilo',
-        introText: 'Hola Arquímedes. ' +
-            'Para poder pasar por mi habitad primero debes ayudarme a ' +
-            'contar cuantas escamas tengo en la espalda. ',
+        introText: 'Hola, Arquímedes. ' +
+            'Para poder pasar por mi hábitat primero debes ayudarme a ' +
+            'contar cuántas escamas tengo en la espalda. ',
         successText: 'Muchas gracias por ayudarme, ' +
             'si sigues adelante te encontrarás con mi amigo el Delfín, ' +
             'es muy amigable y también necesita ayuda.',
@@ -89,7 +89,7 @@ export const LevelsAgua: LevelConfig[] = [
         operation: 'multiplicacion',
         type: 'repaso',
         bgKey: 'delfin',
-        introText: 'Hola pequeñin, ' +
+        introText: 'Hola pequeñín, ' +
             'oí que estabas perdido, no te preocupes tu camino es difícil, pero no imposible. ' +
             'Necesito que me ayudes con mis balones de juego, me gustaría saber cuántos tengo.',
         successText: 'Muchas gracias Arquímedes, a este paso llegarás pronto a tu casa.',
@@ -98,7 +98,7 @@ export const LevelsAgua: LevelConfig[] = [
         operation: 'division',
         type: 'repaso',
         bgKey: 'hipo',
-        introText: '¿Tu eres el famoso Arquímedes verdad? Necesito de tu ayuda, ' +
+        introText: '¿Tú eres el famoso Arquímedes, verdad? Necesito de tu ayuda, ' +
             'verás, me gusta mucho la sandía y me gustaría saber cuántas semillas tiene esta sandía.',
         successText: 'Te agradezco la ayuda que me brindaste, ' +
             'tu familia y amigos se pondrán muy contentos cuando regreses. Hasta la próxima.',
@@ -107,12 +107,12 @@ export const LevelsAgua: LevelConfig[] = [
         operation: 'division',
         type: 'repaso',
         bgKey: 'pingu',
-        introText: 'Mucho gusto Arquímedes, ' +
-            'requiero tu ayuda para saber cuántas piedritas bonitas tengo en mi habitad. ' +
+        introText: 'Mucho gusto, Arquímedes, ' +
+            'requiero tu ayuda para saber cuántas piedritas bonitas tengo en mi hábitat. ' +
             'Generalmente no las cuento, pero ya que estás de paso y eres muy hábil con los números,' +
             ' aprovecharé tu intelecto.',
-        successText: 'En hora buena Arquímedes. ' +
-            'Me sorprenden tus habilidades numéricas, aquél que te ayudó debe ser un genio. ' +
+        successText: '¡Muy bien hecho, Arquímedes! ' +
+            'Me sorprenden tus habilidades numéricas, aquel que te ayudó debe ser un genio. ' +
             'Sigue así y llegarás muy lejos amiguito.',
     },
     {
@@ -120,7 +120,7 @@ export const LevelsAgua: LevelConfig[] = [
         timeLimit: 120,
         type: 'prueba',
         bgKey: 'ajolote',
-        introText: 'Arquímedes, que bien que encontraste el camino de vuelta a casa. ' +
+        introText: 'Arquímedes, ¡Qué bien que encontraste el camino de vuelta a casa! ' +
             'Antes de pasar, necesito que me des la contraseña, podrías ser un impostor. ' +
             'Tienes un tiempo límite de 2 minutos.',
         successText: 'Adelante Arquímedes, has pasado la prueba de autenticidad.',

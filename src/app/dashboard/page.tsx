@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import {
     Edit, Trash2, Play, BarChart2, Plus, X,
-    Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut, Menu, Loader2, Search, Star, TrendingUp
+    Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut, Menu, Loader2, Search, TrendingUp, Printer
 } from "lucide-react";
 import {
     ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -16,7 +16,6 @@ import api from "@/config/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ToastProvider";
 
-// --- INTERFACES ---
 interface Group {
     id_grupo: number;
     Nombre_Grupo: string;
@@ -32,10 +31,17 @@ interface Student {
     grupos?: Group[];
     Activo?: boolean;
     totalStars?: number;
+    rachaDias?: number;
+    rachaEstado?: 'activa' | 'congelada' | 'rota';
 }
 
-// Posicion acumulada de un alumno: puntaje promedio x dificultad promedio
-// historicos (no una serie en el tiempo, es su "estado actual").
+const RACHA_ICONS: Record<'activa' | 'congelada' | 'rota', string> = {
+    activa: '/assets/fire_Icon.png',
+    congelada: '/assets/icyFire_Icon.png',
+    rota: '/assets/ice_Icon.png',
+};
+
+// Estado acumulado del alumno (promedios historicos), no una serie en el tiempo.
 interface GroupStudentSummary {
     id_discente: number;
     nombre: string;
@@ -62,8 +68,7 @@ interface GameConfig {
     trampas: string[];
 }
 
-// Quita acentos/diacríticos para que la búsqueda encuentre "Sofía" al
-// escribir "sofia", sin importar mayúsculas.
+// Quita acentos para que la búsqueda encuentre "Sofía" al escribir "sofia".
 function normalizeSearchText(value: string): string {
     return value
         .normalize("NFD")
@@ -71,9 +76,7 @@ function normalizeSearchText(value: string): string {
         .toLowerCase();
 }
 
-// Tooltip del gráfico de desempeño por alumno: sin leyenda ni colores por
-// identidad, la única forma de saber a quién pertenece un punto es al
-// pasar el cursor sobre él.
+// Sin leyenda ni colores por alumno: el tooltip es la unica forma de identificar cada punto.
 function StudentScatterTooltip({ active, payload }: any) {
     if (!active || !payload || !payload.length) return null;
     const data: GroupStudentSummary = payload[0].payload;
@@ -92,7 +95,6 @@ export default function Dashboard() {
     const { docenteId: docenteActualId, docenteName, logout } = useAuth();
     const { showToast } = useToast();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    // --- ESTADOS DE ALUMNOS ---
     const [students, setStudents] = useState<Student[]>([]);
     const [isLoadingStudents, setIsLoadingStudents] = useState(true);
     const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -118,21 +120,17 @@ export default function Dashboard() {
         Apellido_Paterno_Discente: "",
         Apellido_Materno_Discente: ""
     });
-    // Pestaña del modal de alumno: crear uno nuevo o buscar uno ya existente
     const [studentModalTab, setStudentModalTab] = useState<'nuevo' | 'existente'>('nuevo');
     const [studentSearchQuery, setStudentSearchQuery] = useState("");
     const [isAddingExistingStudent, setIsAddingExistingStudent] = useState(false);
 
-    // Estados para el modal de confirmacion de borrado de alumno
     const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
     const [isDeletingStudent, setIsDeletingStudent] = useState(false);
 
-    // --- ESTADOS DE GRUPOS ---
     const [groups, setGroups] = useState<Group[]>([]);
     const [isGroupsSidebarOpen, setIsGroupsSidebarOpen] = useState(true);
     const [activeGroupId, setActiveGroupId] = useState<number | null>(null);
 
-    // --- ESTADOS DE AVANCE DEL GRUPO ---
     const [showGroupProgressModal, setShowGroupProgressModal] = useState(false);
     const [groupStats, setGroupStats] = useState<GroupStats | null>(null);
     const [isLoadingGroupStats, setIsLoadingGroupStats] = useState(false);
@@ -141,11 +139,10 @@ export default function Dashboard() {
     const [editingGroup, setEditingGroup] = useState<Group | null>(null);
     const [groupFormData, setGroupFormData] = useState({ Nombre_Grupo: "", Año: "", Grado: "" });
 
-    // Estados para el modal de confirmacion de borrado de grupo
     const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
     const [isDeletingGroup, setIsDeletingGroup] = useState(false);
 
-    // EFECTO DE CARGA DE DATOS: se ejecuta solo cuando useAuth ya confirmo la sesion
+    // Espera a que useAuth confirme la sesion antes de pedir datos.
     useEffect(() => {
         if (docenteActualId !== null) {
             fetchStudents();
@@ -153,10 +150,8 @@ export default function Dashboard() {
         }
     }, [docenteActualId]);
 
-    // Calcula el resultado esperado del wizard de partida en vivo. No depende
-    // de la API, asi que no debe volver a pedir alumnos/grupos en cada tecleo.
+    // Solo cálculo local (sin API): no debe re-disparar fetchStudents/fetchGroups en cada tecleo.
     useEffect(() => {
-        // Solo calculamos si todas las cifras requeridas están llenas
         const activeCifras = gameConfig.cifras.filter(c => c !== "");
 
         if (activeCifras.length === gameConfig.numCifras && activeCifras.length > 0) {
@@ -170,17 +165,15 @@ export default function Dashboard() {
                 else if (gameConfig.operation === 'division') calculatedResult /= nums[i];
             }
 
-            // Redondeamos a 2 decimales si la división no es exacta
             const formattedResult = Number.isInteger(calculatedResult)
                 ? String(calculatedResult)
                 : calculatedResult.toFixed(2);
 
-            // Actualizamos el estado solo si el resultado es diferente para evitar ciclos infinitos
+            // Solo actualiza si cambia, para evitar un ciclo infinito de renders.
             if (formattedResult !== gameConfig.resultado) {
                 setGameConfig(prev => ({ ...prev, resultado: formattedResult }));
             }
         } else if (gameConfig.resultado !== "") {
-            // Si el docente borra un número, limpiamos el resultado
             setGameConfig(prev => ({ ...prev, resultado: "" }));
         }
     }, [gameConfig.cifras, gameConfig.operation, gameConfig.numCifras]);
@@ -188,7 +181,9 @@ export default function Dashboard() {
     const fetchStudents = async () => {
         setIsLoadingStudents(true);
         try {
-            const res = await api.get("/discentes");
+            const res = await api.get("/discentes", {
+                params: { tzOffset: new Date().getTimezoneOffset() }
+            });
             setStudents(res.data);
         } catch (error) {
             console.error("Error al cargar alumnos", error);
@@ -214,12 +209,10 @@ export default function Dashboard() {
     // Los alumnos dados de baja por el administrador no se gestionan desde aqui
     const activeStudents = students.filter(student => student.Activo !== false);
 
-    // Solo nos quedamos con los alumnos que tengan el ID del grupo activo
     const filteredStudents = activeStudents.filter(student =>
         student.grupos?.some(g => g.id_grupo === activeGroupId)
     );
 
-    // Alumnos que aun no pertenecen al grupo activo, candidatos para la busqueda
     const studentsAvailableToAdd = activeStudents.filter(student =>
         !student.grupos?.some(g => g.id_grupo === activeGroupId)
     );
@@ -233,7 +226,6 @@ export default function Dashboard() {
             return fullName.includes(normalizeSearchText(studentSearchQuery.trim()));
         });
 
-    // --- MANEJADORES DE ALUMNOS (CRUD) ---
     const handleOpenAddStudent = () => {
         setEditingStudent(null);
         setStudentFormData({ Nombre_Discente: "", Apellido_Paterno_Discente: "", Apellido_Materno_Discente: "" });
@@ -310,9 +302,7 @@ export default function Dashboard() {
         if (!studentToDelete || !activeGroupId) return;
         setIsDeletingStudent(true);
         try {
-            // Dentro de un grupo solo se desasigna al alumno, nunca se le
-            // elimina del sistema: eso solo lo puede hacer un administrador
-            // desde el panel de administración.
+            // Solo desasigna del grupo; eliminar del sistema es exclusivo del panel de administracion.
             await api.delete(`/discentes/${studentToDelete.id_discente}/groups/${activeGroupId}`);
             setStudentToDelete(null);
             showToast("Alumno removido del grupo.", "success");
@@ -325,13 +315,14 @@ export default function Dashboard() {
         }
     };
 
-    // --- AVANCE DEL GRUPO ---
     const handleOpenGroupProgress = async () => {
         if (!activeGroupId) return;
         setShowGroupProgressModal(true);
         setIsLoadingGroupStats(true);
         try {
-            const res = await api.get(`/groups/${activeGroupId}/stats`);
+            const res = await api.get(`/groups/${activeGroupId}/stats`, {
+                params: { tzOffset: new Date().getTimezoneOffset() }
+            });
             setGroupStats(res.data);
         } catch (error) {
             console.error("Error al cargar el avance del grupo", error);
@@ -341,17 +332,19 @@ export default function Dashboard() {
         }
     };
 
-    const formatShortDate = (isoDate: string) =>
-        new Date(isoDate).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    // fecha ya es dia local (backend, ver diaLocal en date.utils.ts). Se parsea a
+    // mano: new Date("YYYY-MM-DD") lo interpretaria como UTC y desplazaria el dia.
+    const formatShortDate = (isoDate: string) => {
+        const [y, m, d] = isoDate.split('-');
+        return `${d}/${m}/${y.slice(2)}`;
+    };
 
-    // Une los promedios diarios del grupo con el formato que espera la grafica.
     const groupAveragesChartData = (groupStats?.groupAverages || []).map((point) => ({
         fecha: formatShortDate(point.fecha),
         puntos: point.avgPuntos,
         dificultad: point.avgDificultad
     }));
 
-    // --- MANEJADORES DE GRUPOS (CRUD COMPLETO CON BACKEND) ---
     const handleOpenAddGroup = (e: React.MouseEvent) => {
         e.stopPropagation();
         setEditingGroup(null);
@@ -379,7 +372,7 @@ export default function Dashboard() {
             Nombre_Grupo: groupFormData.Nombre_Grupo,
             Año: Number(groupFormData.Año),
             Grado: Number(groupFormData.Grado),
-            docente: { id_docente: docenteActualId } // Uso del ID dinamico
+            docente: { id_docente: docenteActualId }
         };
 
         try {
@@ -423,7 +416,6 @@ export default function Dashboard() {
     return (
         <div className="flex h-screen bg-gray-50 text-black overflow-hidden relative">
 
-            {/* Overlay para cerrar la barra lateral en movil */}
             {isSidebarOpen && (
                 <div
                     className="fixed inset-0 bg-black/40 z-30 md:hidden"
@@ -431,7 +423,6 @@ export default function Dashboard() {
                 />
             )}
 
-            {/* ================= BARRA LATERAL (SIDEBAR) ================= */}
             <aside className={`fixed md:relative inset-y-0 left-0 z-40 w-72 bg-gray-900 text-white flex flex-col shadow-2xl transform transition-transform duration-200 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
                 <div className="p-6 border-b border-gray-800 flex items-center gap-3">
                     <div className="p-2 bg-blue-600 rounded-lg">
@@ -517,7 +508,6 @@ export default function Dashboard() {
                 </div>
             </aside>
 
-            {/* ================= CONTENIDO PRINCIPAL ================= */}
             <main className="flex-1 overflow-y-auto p-4 sm:p-8 relative">
                 <div className="max-w-6xl mx-auto">
 
@@ -542,8 +532,14 @@ export default function Dashboard() {
                         {activeGroupId && (
                             <div className="flex items-center gap-3">
                                 <button
+                                    onClick={() => router.push(`/reporte/grupo/${activeGroupId}`)}
+                                    className="flex items-center justify-center gap-2 bg-white text-blue-700 border border-blue-200 px-5 py-2.5 rounded-lg hover:bg-blue-50 transition font-medium shrink-0"
+                                >
+                                    <Printer size={20} /> Imprimir reporte
+                                </button>
+                                <button
                                     onClick={handleOpenGroupProgress}
-                                    className="flex items-center justify-center gap-2 bg-white text-purple-700 border border-purple-200 px-5 py-2.5 rounded-lg hover:bg-purple-50 transition font-medium shrink-0"
+                                    className="flex items-center justify-center gap-2 bg-white text-blue-700 border border-blue-200 px-5 py-2.5 rounded-lg hover:bg-blue-50 transition font-medium shrink-0"
                                 >
                                     <TrendingUp size={20} /> Ver avance del grupo
                                 </button>
@@ -557,7 +553,6 @@ export default function Dashboard() {
                         )}
                     </header>
 
-                    {/* Tabla de Alumnos */}
                     {activeGroupId ? (
                         <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
                             <div className="overflow-x-auto">
@@ -566,15 +561,15 @@ export default function Dashboard() {
                                 <tr className="bg-gray-50 text-gray-600 uppercase text-xs font-bold tracking-wider">
                                     <th className="py-4 px-6 text-left border-b border-gray-200">Nombre Completo</th>
                                     <th className="py-4 px-6 text-center border-b border-gray-200">Estrellas</th>
+                                    <th className="py-4 px-6 text-center border-b border-gray-200">Racha</th>
                                     <th className="py-4 px-6 text-center border-b border-gray-200">Acciones</th>
                                 </tr>
                                 </thead>
                                 <tbody className="text-gray-700 text-sm">
-                                {/* CORRECCIÓN: Usamos filteredStudents en lugar de todos los students */}
                                 {isLoadingStudents ? (
-                                    <tr><td colSpan={3} className="text-center py-10 text-gray-400"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
+                                    <tr><td colSpan={4} className="text-center py-10 text-gray-400"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
                                 ) : filteredStudents.length === 0 ? (
-                                    <tr><td colSpan={3} className="text-center py-8 text-gray-500 italic">No hay alumnos en este grupo</td></tr>
+                                    <tr><td colSpan={4} className="text-center py-8 text-gray-500 italic">No hay alumnos en este grupo</td></tr>
                                 ) : (
                                     filteredStudents.map((student) => (
                                         <tr key={student.id_discente} className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors">
@@ -583,8 +578,14 @@ export default function Dashboard() {
                                             </td>
                                             <td className="py-4 px-6 text-center">
                                                 <span className="inline-flex items-center gap-1 font-semibold text-amber-600">
-                                                    <Star size={16} className="fill-amber-400 text-amber-500" />
+                                                    <img src="/assets/star_Icon.png" alt="" className="w-4 h-4" />
                                                     {student.totalStars ?? 0}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 px-6 text-center">
+                                                <span className="inline-flex items-center gap-1 font-semibold text-gray-700">
+                                                    <img src={RACHA_ICONS[student.rachaEstado ?? 'rota']} alt="" className="w-4 h-4" />
+                                                    {student.rachaDias ?? 0}
                                                 </span>
                                             </td>
                                             <td className="py-4 px-6 text-center">
@@ -596,11 +597,11 @@ export default function Dashboard() {
                                                         label="Jugar"
                                                         onClick={() => {
                                                             setSelectedStudentForPlay(student);
-                                                            setPlayStep(1); // Reiniciar al paso 1
+                                                            setPlayStep(1);
                                                             setGameConfig({ mode: null, type: null, element: null, operation: 'suma', timeLimit: '', numCifras: 2, cifras: ['', ''], resultado: '', numTrampas: 1, trampas: [''] });
                                                             setIsPlayModalOpen(true);
                                                         }}
-                                                        color="text-purple-500"
+                                                        color="text-emerald-600"
                                                     />
                                                     <IconButton icon={<BarChart2 size={18} />} label="Estadísticas" onClick={() => router.push(`/stats/${student.id_discente}`)} color="text-yellow-600" />
                                                 </div>
@@ -621,7 +622,6 @@ export default function Dashboard() {
                 </div>
             </main>
 
-            {/* ================= MODAL DE ALUMNO ================= */}
             {isStudentModalOpen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative overflow-hidden ring-1 ring-gray-200">
@@ -743,7 +743,6 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {/* ================= MODAL DE GRUPO (NUEVO) ================= */}
             {isGroupModalOpen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative overflow-hidden ring-1 ring-gray-200">
@@ -805,13 +804,11 @@ export default function Dashboard() {
                     </div>
                 </div>
             )}
-            {/* ================= MODAL DE CONFIGURACIÓN DE JUEGO ================= */}
             {isPlayModalOpen && selectedStudentForPlay && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl relative overflow-hidden ring-1 ring-gray-200 flex flex-col max-h-[90vh]">
 
-                        {/* Cabecera del Modal */}
-                        <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 border-b border-gray-100 flex justify-between items-center text-white shrink-0">
+                        <div className="bg-blue-600 px-6 py-4 border-b border-gray-100 flex justify-between items-center text-white shrink-0">
                             <div>
                                 <h2 className="text-xl font-bold">Configurar Partida</h2>
                                 <p className="text-sm opacity-90">Alumno: {selectedStudentForPlay.Nombre_Discente}</p>
@@ -821,10 +818,8 @@ export default function Dashboard() {
                             </button>
                         </div>
 
-                        {/* Contenido con Scroll */}
                         <div className="p-6 overflow-y-auto flex-1">
 
-                            {/* PASO 1: MODO DE JUEGO */}
                             {playStep === 1 && (
                                 <div className="space-y-6 text-center">
                                     <h3 className="text-lg font-semibold text-gray-800">Selecciona el modo de juego</h3>
@@ -832,12 +827,11 @@ export default function Dashboard() {
                                         <button
                                             onClick={() => {
                                                 setIsPlayModalOpen(false);
-                                                // MODO HISTORIA: Redirige directo
                                                 router.push(`/play/${selectedStudentForPlay.id_discente}?mode=historia`);
                                             }}
-                                            className="p-6 border-2 border-purple-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all group"
+                                            className="p-6 border-2 border-amber-200 rounded-xl hover:border-amber-500 hover:bg-amber-50 transition-all group"
                                         >
-                                            <BookOpen size={40} className="mx-auto text-purple-400 group-hover:text-purple-600 mb-3" />
+                                            <BookOpen size={40} className="mx-auto text-amber-400 group-hover:text-amber-600 mb-3" />
                                             <span className="block font-bold text-gray-800 text-lg">Modo Historia</span>
                                             <span className="text-sm text-gray-500 mt-2 block">Campaña predeterminada</span>
                                         </button>
@@ -854,7 +848,6 @@ export default function Dashboard() {
                                 </div>
                             )}
 
-                            {/* PASO 2: TIPO Y ELEMENTO */}
                             {playStep === 2 && (
                                 <div className="space-y-6">
                                     <div>
@@ -904,18 +897,15 @@ export default function Dashboard() {
                                 </div>
                             )}
 
-                            {/* PASO 3: FORMULARIO DETALLADO */}
                             {playStep === 3 && (
                                 <form onSubmit={(e) => {
                                     e.preventDefault();
-                                    // Comprimir la configuración en la URL para enviarla al juego
                                     const encodedConfig = encodeURIComponent(JSON.stringify(gameConfig));
                                     router.push(`/play/${selectedStudentForPlay.id_discente}?mode=custom&config=${encodedConfig}`);
                                     setIsPlayModalOpen(false);
                                 }}>
                                     <div className="space-y-5">
 
-                                        {/* Avisos Especiales para Agua */}
                                         {gameConfig.element === 'agua' && (
                                             <div className="bg-cyan-50 border-l-4 border-cyan-500 p-3 mb-4 text-sm text-cyan-800 font-medium">
                                                 <p>Recuerda que la multiplicación puede ser de hasta 3x2 dígitos.</p>
@@ -923,7 +913,6 @@ export default function Dashboard() {
                                             </div>
                                         )}
 
-                                        {/* Operación y Tiempo */}
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-sm font-semibold text-gray-700 mb-1">Operación</label>
@@ -954,9 +943,7 @@ export default function Dashboard() {
                                             </div>
                                         </div>
 
-                                        {/* Cifras de la ecuación */}
                                         <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-                                            {/* Si es Tierra mostramos el selector, si es Agua mostramos un texto fijo */}
                                             {gameConfig.element === 'tierra' ? (
                                                 <div className="flex justify-between items-center mb-3">
                                                     <label className="text-sm font-semibold text-gray-700">Cantidad de cifras a operar (1-5):</label>
@@ -965,7 +952,7 @@ export default function Dashboard() {
                                                         value={gameConfig.numCifras}
                                                         onChange={(e) => {
                                                             const num = parseInt(e.target.value) || 1;
-                                                            const finalNum = num > 5 ? 5 : num; // Limitar a 5
+                                                            const finalNum = num > 5 ? 5 : num;
                                                             setGameConfig({...gameConfig, numCifras: finalNum, cifras: Array(finalNum).fill('')});
                                                         }}
                                                         className="w-20 border border-gray-300 px-2 py-1 rounded text-center focus:ring-2 focus:ring-blue-500"
@@ -995,7 +982,6 @@ export default function Dashboard() {
                                             </div>
                                         </div>
 
-                                        {/* Resultado Esperado (Autocalculado) */}
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-1">
                                                 Resultado
@@ -1009,7 +995,6 @@ export default function Dashboard() {
                                             />
                                         </div>
 
-                                        {/* Números Trampa */}
                                         <div className="p-4 bg-red-50 rounded-xl border border-red-100">
                                             <div className="flex justify-between items-center mb-3">
                                                 <label className="text-sm font-semibold text-red-700">
@@ -1020,7 +1005,6 @@ export default function Dashboard() {
                                                     value={gameConfig.numTrampas}
                                                     onChange={(e) => {
                                                         const num = parseInt(e.target.value) || 0;
-                                                        // Validamos el límite de 4 para CUALQUIER elemento
                                                         const finalNum = num > 4 ? 4 : num;
 
                                                         setGameConfig({...gameConfig, numTrampas: finalNum, trampas: Array(finalNum).fill('')});
@@ -1048,10 +1032,9 @@ export default function Dashboard() {
                                         </div>
                                     </div>
 
-                                    {/* Botones Finales */}
                                     <div className="flex justify-between mt-8 pt-4 border-t border-gray-100 shrink-0">
                                         <button type="button" onClick={() => setPlayStep(2)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium">Atrás</button>
-                                        <button type="submit" className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-lg hover:shadow-lg hover:scale-105 transition-all flex items-center gap-2">
+                                        <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 hover:shadow-lg hover:scale-105 transition-all flex items-center gap-2">
                                             <Play size={18} fill="currentColor" /> Iniciar Partida
                                         </button>
                                     </div>
@@ -1062,7 +1045,6 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {/* ================= MODAL DE CONFIRMACIÓN DE BORRADO DE ALUMNO ================= */}
             {studentToDelete && (
                 <ConfirmDeleteModal
                     title="Quitar del grupo"
@@ -1083,7 +1065,6 @@ export default function Dashboard() {
                 />
             )}
 
-            {/* ================= MODAL DE CONFIRMACIÓN DE BORRADO DE GRUPO ================= */}
             {groupToDelete && (
                 <ConfirmDeleteModal
                     title="Eliminar Grupo"
@@ -1102,7 +1083,6 @@ export default function Dashboard() {
                 />
             )}
 
-            {/* ================= MODAL DE AVANCE DEL GRUPO ================= */}
             {showGroupProgressModal && (
                 <div
                     className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"

@@ -18,9 +18,8 @@ interface UseAuthResult {
     logout: () => void;
 }
 
-// Centraliza la logica de "leer token, validar, decodificar JWT, redirigir
-// si falta" que antes estaba duplicada casi igual en admin/page.tsx y
-// dashboard/page.tsx.
+// Centraliza la logica de leer/validar el token que antes se duplicaba
+// en admin/page.tsx y dashboard/page.tsx.
 export function useAuth(): UseAuthResult {
     const router = useRouter();
     const [docenteId, setDocenteId] = useState<number | null>(null);

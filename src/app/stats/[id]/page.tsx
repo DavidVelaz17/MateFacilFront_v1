@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import api from "@/config/api";
 import { useToast } from "@/components/ToastProvider";
 
-import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, Loader2, ListChecks, X, Check, Heart, Star, TrendingUp } from "lucide-react";
+import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Loader2, ListChecks, X, Check, Heart, TrendingUp, Lock, Printer } from "lucide-react";
 import {
     ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from "recharts";
+import { ACHIEVEMENT_ICONS, ACHIEVEMENT_NAME_OVERRIDES } from "@/config/achievementIcons";
 
 interface DesgloseEvento {
     orden: number;
@@ -17,8 +18,8 @@ interface DesgloseEvento {
     tiempo: number;
 }
 
-// Un sub-intento por cada vez que el alumno choco con la puerta (una vida
-// perdida genera un sub-intento fallido, mas el final exitoso o no).
+// Un sub-intento fallido se crea por cada vida perdida; el ultimo puede
+// terminar exitoso o no.
 interface DesgloseIntento {
     numero: number;
     exitoso: boolean;
@@ -30,12 +31,29 @@ interface Desglose {
     objetivo: number[];
     trampas: number[];
     resultado: number;
-    // Formato nuevo: multiples sub-intentos.
+    // intentos: formato nuevo (multiples sub-intentos). eventos: formato viejo
+    // (partidas registradas antes de este cambio, un solo arreglo plano).
     intentos?: DesgloseIntento[];
-    // Formato viejo (partidas registradas antes de este cambio): un solo
-    // arreglo plano de eventos, sin distinguir sub-intentos.
     eventos?: DesgloseEvento[];
 }
+
+interface Logro {
+    codigo: string;
+    nombre: string;
+    descripcion: string;
+    icono: string;
+    desbloqueado: boolean;
+    fecha: string | null;
+    progreso: { actual: number; total: number } | null;
+}
+
+type EstadoRacha = 'activa' | 'congelada' | 'rota';
+
+const RACHA_ICONS: Record<EstadoRacha, string> = {
+    activa: '/assets/fire_Icon.png',
+    congelada: '/assets/icyFire_Icon.png',
+    rota: '/assets/ice_Icon.png',
+};
 
 export default function StatsPage() {
     const router = useRouter();
@@ -48,13 +66,16 @@ export default function StatsPage() {
         attempts: 0,
         topEmotion: "Desconocido",
         difficulty: "Fácil",
-        recentSessions: [] as any[]
+        recentSessions: [] as any[],
+        streaks: { dias: 0, victorias: 0, estado: 'rota' as EstadoRacha },
+        logros: [] as Logro[]
     });
 
     const [isLoading, setIsLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSession, setSelectedSession] = useState<any | null>(null);
     const [showProgressModal, setShowProgressModal] = useState(false);
+    const [showLogros, setShowLogros] = useState(true);
     const itemsPerPage = 10;
 
     useEffect(() => {
@@ -62,6 +83,7 @@ export default function StatsPage() {
             try {
                 const token = localStorage.getItem("token");
                 const response = await api.get(`/discentes/${params.id}/stats`, {
+                    params: { tzOffset: new Date().getTimezoneOffset() },
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
@@ -86,6 +108,8 @@ export default function StatsPage() {
                     attempts: data.attempts,
                     topEmotion: emocionesMap[data.topEmotion] || "Feliz",
                     difficulty: dificultadMap[data.difficulty] || "Fácil",
+                    streaks: data.streaks || { dias: 0, victorias: 0, estado: 'rota' as EstadoRacha },
+                    logros: (data.logros || []) as Logro[],
                     recentSessions: data.recentSessions.map((session: any) => {
                         const dateObj = new Date(session.fecha);
                         const formattedDate = dateObj.toLocaleString('es-MX', {
@@ -151,7 +175,7 @@ export default function StatsPage() {
             "Difícil": "bg-red-500",
             "Media": "bg-yellow-500",
             "Fácil": "bg-green-500",
-            "Custom": "bg-purple-600",
+            "Custom": "bg-blue-600",
         };
 
         const styles = colorMap[level] || "bg-gray-500";
@@ -166,7 +190,7 @@ export default function StatsPage() {
         const colorMap: Record<string, string> = {
             "Suma": "bg-blue-100 text-blue-700",
             "Resta": "bg-orange-100 text-orange-700",
-            "Multiplicación": "bg-purple-100 text-purple-700",
+            "Multiplicación": "bg-cyan-100 text-cyan-700",
             "División": "bg-pink-100 text-pink-700",
         };
 
@@ -235,10 +259,8 @@ export default function StatsPage() {
         </table>
     );
 
-    // --- DATOS PARA LA GRÁFICA DE AVANCE (orden cronológico ascendente) ---
-    // Cada punto es un intento real (a diferencia de la gráfica del grupo,
-    // que sí agrupa por día): incluimos la hora para que dos intentos del
-    // mismo día no compartan la misma etiqueta en el eje X.
+    // Se incluye la hora (a diferencia de la grafica del grupo, que agrupa por
+    // dia) para que dos intentos del mismo dia no compartan etiqueta en el eje X.
     const progressChartData = [...stats.recentSessions]
         .sort((a, b) => a.fechaRaw.getTime() - b.fechaRaw.getTime())
         .map((session) => ({
@@ -249,7 +271,6 @@ export default function StatsPage() {
             dificultad: session.dificultadNum
         }));
 
-    // --- LÓGICA DE PAGINACIÓN ---
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentSessions = stats.recentSessions.slice(indexOfFirstItem, indexOfLastItem);
@@ -277,13 +298,21 @@ export default function StatsPage() {
                             Alumno: <span className="text-gray-700 font-bold">{stats.studentName || `#${params.id}`}</span>
                         </p>
                     </div>
-                    <button
-                        onClick={() => setShowProgressModal(true)}
-                        disabled={stats.recentSessions.length === 0}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
-                    >
-                        <TrendingUp size={18} /> Ver avance
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => router.push(`/reporte/alumno/${params.id}`)}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 font-medium transition-colors"
+                        >
+                            <Printer size={18} /> Imprimir reporte
+                        </button>
+                        <button
+                            onClick={() => setShowProgressModal(true)}
+                            disabled={stats.recentSessions.length === 0}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
+                        >
+                            <TrendingUp size={18} /> Ver avance
+                        </button>
+                    </div>
                 </header>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -334,6 +363,98 @@ export default function StatsPage() {
                     </div>
                 </div>
 
+                {!isLoading && stats.recentSessions.length > 0 && (
+                    <div className="mb-10">
+                        <div className="flex flex-wrap gap-4 mb-6">
+                            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 flex-1 min-w-[200px]">
+                                <div className="p-3 bg-orange-50 rounded-lg text-orange-500 shrink-0 w-11 h-11 flex items-center justify-center">
+                                    <img src={RACHA_ICONS[stats.streaks.estado ?? 'rota']} alt="" className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-bold text-gray-800">{stats.streaks.dias} {stats.streaks.dias === 1 ? 'día' : 'días'}</h3>
+                                    <p className="text-gray-500 text-xs">jugando seguido</p>
+                                </div>
+                            </div>
+                            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 flex-1 min-w-[200px]">
+                                <div className="p-3 bg-blue-50 rounded-lg text-blue-600 shrink-0 w-11 h-11 flex items-center justify-center">
+                                    <img src="/assets/target_Icon.png" alt="" className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-bold text-gray-800">{stats.streaks.victorias} {stats.streaks.victorias === 1 ? 'partida' : 'partidas'}</h3>
+                                    <p className="text-gray-500 text-xs">ganadas seguidas</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-6">
+                            <button
+                                onClick={() => setShowLogros((prev) => !prev)}
+                                className="w-full flex items-center justify-between gap-2 text-left"
+                            >
+                                <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                                    🏅 Logros — {stats.logros.filter(l => l.desbloqueado).length} de {stats.logros.length} desbloqueados
+                                </h3>
+                                {showLogros ? (
+                                    <ChevronUp size={18} className="text-gray-400 shrink-0" />
+                                ) : (
+                                    <ChevronDown size={18} className="text-gray-400 shrink-0" />
+                                )}
+                            </button>
+                            {showLogros && (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
+                                    {stats.logros.map((logro) => {
+                                        const iconSrc = ACHIEVEMENT_ICONS[logro.codigo];
+                                        const nombre = ACHIEVEMENT_NAME_OVERRIDES[logro.codigo] ?? logro.nombre;
+                                        return (
+                                        <div
+                                            key={logro.codigo}
+                                            className={`rounded-lg p-3 text-center border flex flex-col items-center gap-1.5 ${
+                                                logro.desbloqueado ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-200"
+                                            }`}
+                                        >
+                                            {iconSrc ? (
+                                                <img
+                                                    src={iconSrc}
+                                                    alt=""
+                                                    className={`w-7 h-7 ${logro.desbloqueado ? "" : "grayscale opacity-40"}`}
+                                                />
+                                            ) : (
+                                                <span className={`text-2xl leading-none ${logro.desbloqueado ? "" : "grayscale opacity-40"}`}>
+                                                    {logro.icono}
+                                                </span>
+                                            )}
+                                            <span className={`text-xs font-bold ${logro.desbloqueado ? "text-gray-800" : "text-gray-400"}`}>
+                                                {nombre}
+                                            </span>
+                                            <span className="text-[10.5px] text-gray-500 leading-tight min-h-[26px]">
+                                                {logro.descripcion}
+                                            </span>
+                                            {logro.desbloqueado ? (
+                                                <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                                                    {new Date(logro.fecha as string).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
+                                                </span>
+                                            ) : logro.progreso ? (
+                                                <div className="w-full">
+                                                    <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-blue-300 rounded-full"
+                                                            style={{ width: `${Math.min(100, (logro.progreso.actual / logro.progreso.total) * 100)}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[10px] text-gray-400">{logro.progreso.actual} / {logro.progreso.total}</span>
+                                                </div>
+                                            ) : (
+                                                <Lock size={12} className="text-gray-300" />
+                                            )}
+                                        </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <div className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                         <h3 className="font-bold text-gray-700 flex items-center gap-2">
@@ -360,7 +481,6 @@ export default function StatsPage() {
                             </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 text-gray-700">
-                            {/* Iteramos sobre currentSessions en lugar de todo el arreglo */}
                             {currentSessions.map((session, index) => (
                                 <tr key={index} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-3">{session.date}</td>
@@ -373,7 +493,7 @@ export default function StatsPage() {
                                     <td className="px-6 py-3 font-medium">{session.score} / 100</td>
                                     <td className="px-6 py-3">
                                         <span className="inline-flex items-center gap-1 text-yellow-500 font-semibold">
-                                            <Star size={14} className="fill-current" /> {session.estrellas}
+                                            <img src="/assets/star_Icon.png" alt="" className="w-3.5 h-3.5" /> {session.estrellas}
                                         </span>
                                     </td>
                                     <td className="px-6 py-3">
@@ -385,7 +505,7 @@ export default function StatsPage() {
                                         <button
                                             onClick={() => setSelectedSession(session)}
                                             title="Ver desglose de la partida"
-                                            className="inline-flex items-center justify-center p-2 rounded-lg text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors"
+                                            className="inline-flex items-center justify-center p-2 rounded-lg text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
                                         >
                                             <ListChecks size={18} />
                                         </button>
@@ -396,7 +516,6 @@ export default function StatsPage() {
                         </table>
                         )}
 
-                        {/* Mensaje de sin datos */}
                         {!isLoading && stats.recentSessions.length === 0 && (
                             <div className="p-6 text-center text-gray-500">
                                 No hay sesiones registradas aún.
@@ -404,7 +523,6 @@ export default function StatsPage() {
                         )}
                     </div>
 
-                    {/* CONTROLES DE PAGINACIÓN */}
                     {stats.recentSessions.length > 0 && (
                         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
                             <span className="text-sm text-gray-500">
@@ -466,7 +584,7 @@ export default function StatsPage() {
                                     </span>
                                 )}
                                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-yellow-50 text-yellow-600">
-                                    <Star size={12} className="fill-current" /> {selectedSession.estrellas} {selectedSession.estrellas === 1 ? 'estrella' : 'estrellas'}
+                                    <img src="/assets/star_Icon.png" alt="" className="w-3 h-3" /> {selectedSession.estrellas} {selectedSession.estrellas === 1 ? 'estrella' : 'estrellas'}
                                 </span>
                             </div>
 
