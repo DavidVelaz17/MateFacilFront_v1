@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import api from "@/config/api";
 import { useToast } from "@/components/ToastProvider";
 
-import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Loader2, ListChecks, X, Check, Heart, Star, TrendingUp, Lock, Printer } from "lucide-react";
+import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Loader2, ListChecks, X, Check, Heart, TrendingUp, Lock, Printer } from "lucide-react";
 import {
     ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from "recharts";
@@ -47,6 +47,14 @@ interface Logro {
     progreso: { actual: number; total: number } | null;
 }
 
+type EstadoRacha = 'activa' | 'congelada' | 'rota';
+
+const RACHA_ICONS: Record<EstadoRacha, string> = {
+    activa: '/assets/fire_Icon.png',
+    congelada: '/assets/icyFire_Icon.png',
+    rota: '/assets/ice_Icon.png',
+};
+
 export default function StatsPage() {
     const router = useRouter();
     const params = useParams();
@@ -59,7 +67,7 @@ export default function StatsPage() {
         topEmotion: "Desconocido",
         difficulty: "Fácil",
         recentSessions: [] as any[],
-        streaks: { dias: 0, victorias: 0 },
+        streaks: { dias: 0, victorias: 0, estado: 'rota' as EstadoRacha },
         logros: [] as Logro[]
     });
 
@@ -100,7 +108,7 @@ export default function StatsPage() {
                     attempts: data.attempts,
                     topEmotion: emocionesMap[data.topEmotion] || "Feliz",
                     difficulty: dificultadMap[data.difficulty] || "Fácil",
-                    streaks: data.streaks || { dias: 0, victorias: 0 },
+                    streaks: data.streaks || { dias: 0, victorias: 0, estado: 'rota' as EstadoRacha },
                     logros: (data.logros || []) as Logro[],
                     recentSessions: data.recentSessions.map((session: any) => {
                         const dateObj = new Date(session.fecha);
@@ -360,7 +368,7 @@ export default function StatsPage() {
                         <div className="flex flex-wrap gap-4 mb-6">
                             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 flex-1 min-w-[200px]">
                                 <div className="p-3 bg-orange-50 rounded-lg text-orange-500 shrink-0 w-11 h-11 flex items-center justify-center">
-                                    <img src="/assets/fire_Icon.png" alt="" className="w-6 h-6" />
+                                    <img src={RACHA_ICONS[stats.streaks.estado ?? 'rota']} alt="" className="w-6 h-6" />
                                 </div>
                                 <div>
                                     <h3 className="text-2xl font-bold text-gray-800">{stats.streaks.dias} {stats.streaks.dias === 1 ? 'día' : 'días'}</h3>
@@ -485,7 +493,7 @@ export default function StatsPage() {
                                     <td className="px-6 py-3 font-medium">{session.score} / 100</td>
                                     <td className="px-6 py-3">
                                         <span className="inline-flex items-center gap-1 text-yellow-500 font-semibold">
-                                            <Star size={14} className="fill-current" /> {session.estrellas}
+                                            <img src="/assets/star_Icon.png" alt="" className="w-3.5 h-3.5" /> {session.estrellas}
                                         </span>
                                     </td>
                                     <td className="px-6 py-3">
@@ -576,7 +584,7 @@ export default function StatsPage() {
                                     </span>
                                 )}
                                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-yellow-50 text-yellow-600">
-                                    <Star size={12} className="fill-current" /> {selectedSession.estrellas} {selectedSession.estrellas === 1 ? 'estrella' : 'estrellas'}
+                                    <img src="/assets/star_Icon.png" alt="" className="w-3 h-3" /> {selectedSession.estrellas} {selectedSession.estrellas === 1 ? 'estrella' : 'estrellas'}
                                 </span>
                             </div>
 

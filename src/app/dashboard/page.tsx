@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import {
     Edit, Trash2, Play, BarChart2, Plus, X,
-    Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut, Menu, Loader2, Search, Star, TrendingUp, Printer
+    Users, ChevronDown, ChevronRight, BookOpen, Edit2, Trash, LogOut, Menu, Loader2, Search, TrendingUp, Printer
 } from "lucide-react";
 import {
     ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -31,7 +31,15 @@ interface Student {
     grupos?: Group[];
     Activo?: boolean;
     totalStars?: number;
+    rachaDias?: number;
+    rachaEstado?: 'activa' | 'congelada' | 'rota';
 }
+
+const RACHA_ICONS: Record<'activa' | 'congelada' | 'rota', string> = {
+    activa: '/assets/fire_Icon.png',
+    congelada: '/assets/icyFire_Icon.png',
+    rota: '/assets/ice_Icon.png',
+};
 
 // Estado acumulado del alumno (promedios historicos), no una serie en el tiempo.
 interface GroupStudentSummary {
@@ -173,7 +181,9 @@ export default function Dashboard() {
     const fetchStudents = async () => {
         setIsLoadingStudents(true);
         try {
-            const res = await api.get("/discentes");
+            const res = await api.get("/discentes", {
+                params: { tzOffset: new Date().getTimezoneOffset() }
+            });
             setStudents(res.data);
         } catch (error) {
             console.error("Error al cargar alumnos", error);
@@ -551,14 +561,15 @@ export default function Dashboard() {
                                 <tr className="bg-gray-50 text-gray-600 uppercase text-xs font-bold tracking-wider">
                                     <th className="py-4 px-6 text-left border-b border-gray-200">Nombre Completo</th>
                                     <th className="py-4 px-6 text-center border-b border-gray-200">Estrellas</th>
+                                    <th className="py-4 px-6 text-center border-b border-gray-200">Racha</th>
                                     <th className="py-4 px-6 text-center border-b border-gray-200">Acciones</th>
                                 </tr>
                                 </thead>
                                 <tbody className="text-gray-700 text-sm">
                                 {isLoadingStudents ? (
-                                    <tr><td colSpan={3} className="text-center py-10 text-gray-400"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
+                                    <tr><td colSpan={4} className="text-center py-10 text-gray-400"><Loader2 size={22} className="animate-spin mx-auto" /></td></tr>
                                 ) : filteredStudents.length === 0 ? (
-                                    <tr><td colSpan={3} className="text-center py-8 text-gray-500 italic">No hay alumnos en este grupo</td></tr>
+                                    <tr><td colSpan={4} className="text-center py-8 text-gray-500 italic">No hay alumnos en este grupo</td></tr>
                                 ) : (
                                     filteredStudents.map((student) => (
                                         <tr key={student.id_discente} className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors">
@@ -567,8 +578,14 @@ export default function Dashboard() {
                                             </td>
                                             <td className="py-4 px-6 text-center">
                                                 <span className="inline-flex items-center gap-1 font-semibold text-amber-600">
-                                                    <Star size={16} className="fill-amber-400 text-amber-500" />
+                                                    <img src="/assets/star_Icon.png" alt="" className="w-4 h-4" />
                                                     {student.totalStars ?? 0}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 px-6 text-center">
+                                                <span className="inline-flex items-center gap-1 font-semibold text-gray-700">
+                                                    <img src={RACHA_ICONS[student.rachaEstado ?? 'rota']} alt="" className="w-4 h-4" />
+                                                    {student.rachaDias ?? 0}
                                                 </span>
                                             </td>
                                             <td className="py-4 px-6 text-center">

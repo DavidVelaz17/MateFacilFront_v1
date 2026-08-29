@@ -335,12 +335,12 @@ export class UIFacade {
         });
 
         let isPaused = false;
-        const pauseBtn = this.scene.add.image(gameWidth - 50, 30, isPaused ? 'pause': 'play')
+        const pauseBtn = this.scene.add.image(gameWidth - 50, 30, isPaused ? 'play': 'pause')
             .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(200);
 
         pauseBtn.on('pointerdown', () => {
             isPaused = !isPaused;
-            pauseBtn.setTexture(isPaused ? 'pause' : 'play');
+            pauseBtn.setTexture(isPaused ? 'play' : 'pause');
             EventBus.emit('togglePause', isPaused);
         });
     }

@@ -204,6 +204,13 @@ export class GameScene extends Phaser.Scene {
                 this.physics.resume();
                 this.player.anims.resume();
             }
+
+            const currentMusicKey = this.registry.get('currentMusicKey');
+            const music = currentMusicKey ? this.sound.get(currentMusicKey) : null;
+            if (music) {
+                if (paused) music.pause();
+                else music.resume();
+            }
         }, this);
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

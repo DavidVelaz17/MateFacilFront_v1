@@ -96,7 +96,7 @@ export class PreloadScene extends Phaser.Scene{
         this.load.image('icono_cohete','/assets/launcher_Icon.png');
         this.load.image('icono_rayo','/assets/lightning_Icon.png');
         this.load.image('icono_pausa','/assets/pause_Icon.png');
-        this.load.image('icono_segundaOportunidad','/assets/seconOportunity_Icon.png');
+        this.load.image('icono_segundaOportunidad','/assets/secondOportunity_Icon.png');
         this.load.image('icono_escudo','/assets/shield_Icon.png');
         this.load.image('icono_fuerte','/assets/strong_Icon.png');
         this.load.image('icono_cirujano','/assets/surgeon_Icon.png');

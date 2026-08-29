@@ -80,12 +80,13 @@ export default function PlayPage() {
                 return;
             }
 
+            let response;
             try {
                 console.log("Atrapando estadísticas desde Phaser:", stats);
 
                 // TzOffset: el backend agrupa la racha de dias por el dia
                 // calendario local del alumno, no por UTC.
-                const response = await api.post(
+                response = await api.post(
                     `/discentes/${idDiscente}/attempts`,
                     { ...stats, TzOffset: new Date().getTimezoneOffset() },
                     {
@@ -94,7 +95,17 @@ export default function PlayPage() {
                 );
 
                 console.log("¡Estadísticas guardadas exitosamente en la base de datos!");
+            } catch (error) {
+                console.error("Fallo al guardar las estadísticas en el backend:", error);
+                showToast("No se pudo guardar el resultado de esta partida.", "error");
+                return;
+            }
 
+            // Fuera del try/catch de arriba a proposito: la partida ya se guardo,
+            // asi que un error aqui (ej. NotificationScene ya destruida si el
+            // jugador salio/reinicio mientras el POST seguia en vuelo) no debe
+            // reportarse como fallo de guardado.
+            try {
                 // NotificationScene (dentro de Phaser) dibuja el aviso de racha/logro
                 // para que sobreviva a cambios de escena, en vez de flotar sobre React.
                 const { logrosNuevos, rachaDias, rachaVictorias } = response.data;
@@ -103,8 +114,7 @@ export default function PlayPage() {
                 }
                 EventBus.emit('streakUpdate', { dias: rachaDias, victorias: rachaVictorias });
             } catch (error) {
-                console.error("Fallo al guardar las estadísticas en el backend:", error);
-                showToast("No se pudo guardar el resultado de esta partida.", "error");
+                console.error("La partida se guardó, pero falló al mostrar el aviso de racha/logro:", error);
             }
         };
 

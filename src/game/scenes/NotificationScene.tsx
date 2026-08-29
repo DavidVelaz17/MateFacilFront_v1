@@ -53,6 +53,11 @@ export class NotificationScene extends Phaser.Scene {
     }
 
     private handleStreakUpdate = (data: RachaData) => {
+        // El listener sigue registrado en el EventBus (singleton, independiente
+        // del Phaser.Game) aunque la escena ya se haya destruido, por ejemplo si
+        // el jugador sale/reinicia mientras el POST de la partida sigue en vuelo.
+        if (!this.scene) return;
+
         const mostrarDias = data.dias >= 2;
         const mostrarVictorias = data.victorias >= 2;
         if (!mostrarDias && !mostrarVictorias) return;
@@ -99,6 +104,7 @@ export class NotificationScene extends Phaser.Scene {
     }
 
     private handleLogrosUnlocked = (logros: LogroDesbloqueado[]) => {
+        if (!this.scene) return;
         if (!logros || logros.length === 0) return;
         this.scene.bringToTop();
         this.logroQueue.push(...logros);

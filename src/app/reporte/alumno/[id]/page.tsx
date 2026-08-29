@@ -78,6 +78,14 @@ const EMOCION_LABEL: Record<number, string> = {
     3: "Muy Feliz",
 };
 
+type EstadoRacha = 'activa' | 'congelada' | 'rota';
+
+const RACHA_ICONS: Record<EstadoRacha, string> = {
+    activa: '/assets/fire_Icon.png',
+    congelada: '/assets/icyFire_Icon.png',
+    rota: '/assets/ice_Icon.png',
+};
+
 interface ReportData {
     studentName: string;
     grupos: string[];
@@ -89,7 +97,7 @@ interface ReportData {
         totalStars: number;
     };
     estadoActual: {
-        streaks: { dias: number; victorias: number };
+        streaks: { dias: number; victorias: number; estado: EstadoRacha };
         nivelMapaTierra: number;
         nivelMapaAgua: number;
         logrosTotales: number;
@@ -230,7 +238,7 @@ export default function ReporteAlumnoPage() {
                                     <p className="text-[10px] text-gray-500 uppercase">Emoción</p>
                                 </div>
                                 <div className="border border-gray-200 rounded-lg p-3 text-center">
-                                    <p className="text-xl font-bold text-gray-800">⭐ {data.resumenPeriodo.totalStars}</p>
+                                    <p className="text-xl font-bold text-gray-800 flex items-center justify-center gap-1"><img src="/assets/star_Icon.png" alt="" className="w-4 h-4" /> {data.resumenPeriodo.totalStars}</p>
                                     <p className="text-[10px] text-gray-500 uppercase">Estrellas</p>
                                 </div>
                             </div>
@@ -241,7 +249,7 @@ export default function ReporteAlumnoPage() {
                         <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">Estado actual</h2>
                         <div className="grid grid-cols-5 gap-4">
                             <div className="border border-gray-200 rounded-lg p-3 text-center">
-                                <p className="text-xl font-bold text-gray-800 flex items-center justify-center gap-1"><img src="/assets/fire_Icon.png" alt="" className="w-4 h-4" /> {data.estadoActual.streaks.dias}</p>
+                                <p className="text-xl font-bold text-gray-800 flex items-center justify-center gap-1"><img src={RACHA_ICONS[data.estadoActual.streaks.estado ?? 'rota']} alt="" className="w-4 h-4" /> {data.estadoActual.streaks.dias}</p>
                                 <p className="text-[10px] text-gray-500 uppercase">Racha días</p>
                             </div>
                             <div className="border border-gray-200 rounded-lg p-3 text-center">
@@ -361,7 +369,7 @@ export default function ReporteAlumnoPage() {
                                             <td className="px-3 py-2">{OPERACION_LABEL[s.operacion] || s.operacion}</td>
                                             <td className="px-3 py-2">{s.Dificultad}</td>
                                             <td className="px-3 py-2">{s.score}</td>
-                                            <td className="px-3 py-2">⭐ {s.estrellas}</td>
+                                            <td className="px-3 py-2"><span className="inline-flex items-center gap-1"><img src="/assets/star_Icon.png" alt="" className="w-3.5 h-3.5" /> {s.estrellas}</span></td>
                                             <td className="px-3 py-2">{EMOCION_LABEL[s.emotion] || '—'}</td>
                                         </tr>
                                     ))}
