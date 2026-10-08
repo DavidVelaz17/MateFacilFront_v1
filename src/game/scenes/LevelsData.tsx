@@ -1,9 +1,14 @@
 export type DificultadNum = 1 | 2 | 3;
 
+// 'operandos': el alumno recoge las cifras a partir del resultado (? + ? = r).
+// 'resultado': el alumno recoge el resultado a partir de las cifras (a + b = ?).
+export type ModoProblema = 'operandos' | 'resultado';
+
 export interface ProblemaMatematico {
     cifras: number[];
     resultado: number;
     trampas: number[];
+    modo: ModoProblema;
 }
 
 export interface LevelConfig {

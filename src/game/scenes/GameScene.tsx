@@ -7,7 +7,7 @@ import {
 } from './patterns';
 import {audioManager} from "@/game/scenes/audioManager";
 import { generateProblema } from './exerciseGenerator';
-import type { DificultadNum, ProblemaMatematico } from './LevelsData';
+import type { DificultadNum, ModoProblema, ProblemaMatematico } from './LevelsData';
 
 interface DesgloseEvento {
     orden: number;
@@ -46,7 +46,11 @@ export class GameScene extends Phaser.Scene {
     private currentElement: 'tierra' | 'agua' = 'tierra';
 
     private levelConfig = {
+        // Lo que el alumno debe recoger: las cifras (modo 'operandos') o el
+        // resultado (modo 'resultado', dificultad facil).
         targetNumbers: [] as number[],
+        modo: 'operandos' as ModoProblema,
+        operandos: [] as number[],
         solution: 0,
         platformCount: 7,
         trapNumbers: [] as number[]
@@ -88,12 +92,15 @@ export class GameScene extends Phaser.Scene {
 
             if (this.levelData.gameMode === 'custom' || this.levelData.mode === 'custom') {
                 this.currentDifficulty = 4;
+                this.levelConfig.modo = 'operandos';
 
                 this.levelConfig.targetNumbers = (this.levelData.cifras || [])
                     .filter((c: any) => c !== '').map(Number);
                 this.levelConfig.trapNumbers = (this.levelData.trampas || [])
                     .filter((c: any) => c !== '').map(Number);
                 this.levelConfig.solution = Number(this.levelData.resultado);
+                this.levelConfig.operandos = this.levelConfig.targetNumbers;
+                this.levelConfig.platformCount = this.levelConfig.targetNumbers.length + this.levelConfig.trapNumbers.length + 2;
 
             } else {
                 this.currentDifficulty = data.dificultad || 2;
@@ -105,12 +112,16 @@ export class GameScene extends Phaser.Scene {
                     ?? generateProblema(this.levelData.operation, dificultadGenerador, esPrueba);
 
                 this.currentProblema = problemaActual;
-                this.levelConfig.targetNumbers = problemaActual.cifras;
+                this.levelConfig.modo = problemaActual.modo;
+                this.levelConfig.operandos = problemaActual.cifras;
+                this.levelConfig.targetNumbers = problemaActual.modo === 'resultado'
+                    ? [problemaActual.resultado]
+                    : problemaActual.cifras;
                 this.levelConfig.trapNumbers = problemaActual.trampas;
                 this.levelConfig.solution = problemaActual.resultado;
+                // Mismo numero de plataformas en ambos modos (calculado con las cifras).
+                this.levelConfig.platformCount = problemaActual.cifras.length + problemaActual.trampas.length + 2;
             }
-
-            this.levelConfig.platformCount = this.levelConfig.targetNumbers.length + this.levelConfig.trapNumbers.length + 2;
         }
     }
 
@@ -326,6 +337,12 @@ export class GameScene extends Phaser.Scene {
             }
         }
 
+        if (this.levelConfig.modo === 'resultado') {
+            const collected = this.gameState.collectedNumbers;
+            const resultado = collected.length > 0 ? String(collected[0]) : '?';
+            return `${this.levelConfig.operandos.join(` ${symbol} `)} = ${resultado}`;
+        }
+
         const numCifras = (this.levelData && this.levelData.numCifras) || this.levelConfig.targetNumbers.length;
         const collected = this.gameState.collectedNumbers;
         const slots = Array.from({ length: numCifras }, (_, i) =>
@@ -510,6 +527,8 @@ export class GameScene extends Phaser.Scene {
             objetivo: this.levelConfig.targetNumbers,
             trampas: this.levelConfig.trapNumbers,
             resultado: this.levelConfig.solution,
+            modo: this.levelConfig.modo,
+            operandos: this.levelConfig.operandos,
             intentos: [...this.gameState.historialIntentos, intentoFinal]
         };
     }
