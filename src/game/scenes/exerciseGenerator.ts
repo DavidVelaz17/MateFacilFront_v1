@@ -1,4 +1,4 @@
-import type { DificultadNum, ProblemaMatematico } from './LevelsData';
+import type { DificultadNum, ModoProblema, ProblemaMatematico } from './LevelsData';
 
 type Operacion = 'suma' | 'resta' | 'multiplicacion' | 'division';
 
@@ -28,10 +28,24 @@ function generarTrampas(cifrasCorrectas: number[], cantidad: number, excluir: nu
     return trampas;
 }
 
+// En dificultad facil el alumno elige el resultado; en las demas, las cifras.
+function modoPorDificultad(dificultad: DificultadNum): ModoProblema {
+    return dificultad === 1 ? 'resultado' : 'operandos';
+}
+
+// Las trampas se generan alrededor de lo que el alumno debe recoger.
+function armarProblema(cifras: number[], resultado: number, dificultad: DificultadNum): ProblemaMatematico {
+    const modo = modoPorDificultad(dificultad);
+    const trampas = modo === 'resultado'
+        ? generarTrampas([resultado], 3, cifras)
+        : generarTrampas(cifras, 3, [resultado]);
+    return { cifras, resultado, trampas, modo };
+}
+
 const RANGOS_SUMA_RESTA: Record<DificultadNum, [number, number]> = {
-    1: [100, 999],
-    2: [1000, 9999],
-    3: [10000, 499999],
+    1: [10, 99],
+    2: [100, 999],
+    3: [1000, 9999],
 };
 
 function generarSumaResta(operacion: 'suma' | 'resta', dificultad: DificultadNum): ProblemaMatematico {
@@ -41,18 +55,22 @@ function generarSumaResta(operacion: 'suma' | 'resta', dificultad: DificultadNum
 
     if (operacion === 'resta') {
         // Sin negativos: en 4to de primaria (NEM) aun no se ensenan.
-        if (a === b) b = Math.max(min, b - 1);
+        // Sin resultado 0: si son iguales se separan sin salir del rango.
+        if (a === b) {
+            if (b > min) b--;
+            else a++;
+        }
         if (a < b) [a, b] = [b, a];
     }
 
     const resultado = operacion === 'suma' ? a + b : a - b;
-    return { cifras: [a, b], resultado, trampas: generarTrampas([a, b], 3, [resultado]) };
+    return armarProblema([a, b], resultado, dificultad);
 }
 
 const RANGOS_MULTIPLICACION: Record<DificultadNum, { op1: [number, number]; op2: [number, number] }> = {
     1: { op1: [10, 99], op2: [2, 9] },
-    2: { op1: [100, 499], op2: [10, 49] },
-    3: { op1: [500, 999], op2: [50, 99] },
+    2: { op1: [10, 99], op2: [2, 9] },
+    3: { op1: [100, 499], op2: [10, 49] },
 };
 
 function generarMultiplicacion(dificultad: DificultadNum): ProblemaMatematico {
@@ -60,29 +78,34 @@ function generarMultiplicacion(dificultad: DificultadNum): ProblemaMatematico {
     const a = randomInt(op1[0], op1[1]);
     const b = randomInt(op2[0], op2[1]);
     const resultado = a * b;
-    return { cifras: [a, b], resultado, trampas: generarTrampas([a, b], 3, [resultado]) };
+    return armarProblema([a, b], resultado, dificultad);
 }
 
-const RANGOS_DIVISION: Record<DificultadNum, { divisor: [number, number]; cociente: [number, number] }> = {
-    1: { divisor: [2, 9], cociente: [10, 99] },
-    2: { divisor: [2, 9], cociente: [100, 299] },
-    3: { divisor: [2, 9], cociente: [300, 999] },
-};
+type RangoDivision = { divisor: [number, number]; cociente: [number, number] };
 
-// Divisores mayores que en RANGOS_DIVISION, para igualar los niveles fijos originales (6, 12, 25).
-const RANGOS_DIVISION_PRUEBA: Record<DificultadNum, { divisor: [number, number]; cociente: [number, number] }> = {
-    1: { divisor: [4, 8], cociente: [20, 90] },
-    2: { divisor: [9, 15], cociente: [50, 150] },
-    3: { divisor: [16, 30], cociente: [50, 200] },
-};
+// Dificultad dificil.
+const RANGO_DIVISION_DIFICIL: RangoDivision = { divisor: [2, 9], cociente: [300, 999] };
+
+// Divisores mayores que en RANGO_DIVISION_DIFICIL, para igualar el nivel fijo original (25).
+const RANGO_DIVISION_DIFICIL_PRUEBA: RangoDivision = { divisor: [16, 30], cociente: [50, 200] };
+
+// Dificultad facil y media (repaso y prueba): divisor de hasta 2 digitos y
+// dividendo de hasta 4 digitos.
+const DIVISION_FACIL_MEDIA = { divisor: [2, 99] as [number, number], cocienteMin: 10, dividendoMax: 9999 };
 
 function generarDivision(dificultad: DificultadNum, esPrueba: boolean): ProblemaMatematico {
-    const rango = esPrueba ? RANGOS_DIVISION_PRUEBA[dificultad] : RANGOS_DIVISION[dificultad];
+    if (dificultad !== 3) {
+        const divisor = randomInt(DIVISION_FACIL_MEDIA.divisor[0], DIVISION_FACIL_MEDIA.divisor[1]);
+        const cociente = randomInt(DIVISION_FACIL_MEDIA.cocienteMin, Math.floor(DIVISION_FACIL_MEDIA.dividendoMax / divisor));
+        return armarProblema([divisor * cociente, divisor], cociente, dificultad);
+    }
+
+    const rango = esPrueba ? RANGO_DIVISION_DIFICIL_PRUEBA : RANGO_DIVISION_DIFICIL;
     const divisor = randomInt(rango.divisor[0], rango.divisor[1]);
     const cociente = randomInt(rango.cociente[0], rango.cociente[1]);
     // Division exacta garantizada: dividendo = divisor * cociente.
     const dividendo = divisor * cociente;
-    return { cifras: [dividendo, divisor], resultado: cociente, trampas: generarTrampas([dividendo, divisor], 3, [cociente]) };
+    return armarProblema([dividendo, divisor], cociente, dificultad);
 }
 
 export function generateProblema(operacion: Operacion, dificultad: DificultadNum, esPrueba: boolean = false): ProblemaMatematico {

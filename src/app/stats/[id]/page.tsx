@@ -31,6 +31,10 @@ interface Desglose {
     objetivo: number[];
     trampas: number[];
     resultado: number;
+    // modo/operandos: ausentes en partidas anteriores a la dificultad facil
+    // por resultado; sin ellos se asume 'operandos' (objetivo = cifras).
+    modo?: 'operandos' | 'resultado';
+    operandos?: number[];
     // intentos: formato nuevo (multiples sub-intentos). eventos: formato viejo
     // (partidas registradas antes de este cambio, un solo arreglo plano).
     intentos?: DesgloseIntento[];
@@ -597,7 +601,10 @@ export default function StatsPage() {
                                     <div className="mb-5 bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
                                         <p className="text-xs uppercase font-semibold text-gray-500 mb-2">Ecuación objetivo</p>
                                         <p className="text-lg font-mono font-bold text-gray-800">
-                                            {selectedSession.desglose.objetivo.join(` ${getOperationSymbol(selectedSession.operationKey)} `)}
+                                            {(selectedSession.desglose.modo === 'resultado'
+                                                ? selectedSession.desglose.operandos ?? []
+                                                : selectedSession.desglose.objetivo
+                                            ).join(` ${getOperationSymbol(selectedSession.operationKey)} `)}
                                             {' = '}
                                             {selectedSession.desglose.resultado}
                                         </p>
