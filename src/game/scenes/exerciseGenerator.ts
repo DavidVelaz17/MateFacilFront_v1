@@ -54,8 +54,7 @@ function generarSumaResta(operacion: 'suma' | 'resta', dificultad: DificultadNum
     let b = randomInt(min, max);
 
     if (operacion === 'resta') {
-        // Sin negativos: en 4to de primaria (NEM) aun no se ensenan.
-        // Sin resultado 0: si son iguales se separan sin salir del rango.
+        // Sin negativos ni 0
         if (a === b) {
             if (b > min) b--;
             else a++;
@@ -82,15 +81,8 @@ function generarMultiplicacion(dificultad: DificultadNum): ProblemaMatematico {
 }
 
 type RangoDivision = { divisor: [number, number]; cociente: [number, number] };
-
-// Dificultad dificil.
 const RANGO_DIVISION_DIFICIL: RangoDivision = { divisor: [2, 9], cociente: [300, 999] };
-
-// Divisores mayores que en RANGO_DIVISION_DIFICIL, para igualar el nivel fijo original (25).
 const RANGO_DIVISION_DIFICIL_PRUEBA: RangoDivision = { divisor: [16, 30], cociente: [50, 200] };
-
-// Dificultad facil y media (repaso y prueba): divisor de hasta 2 digitos y
-// dividendo de hasta 4 digitos.
 const DIVISION_FACIL_MEDIA = { divisor: [2, 99] as [number, number], cocienteMin: 10, dividendoMax: 9999 };
 
 function generarDivision(dificultad: DificultadNum, esPrueba: boolean): ProblemaMatematico {
@@ -103,12 +95,14 @@ function generarDivision(dificultad: DificultadNum, esPrueba: boolean): Problema
     const rango = esPrueba ? RANGO_DIVISION_DIFICIL_PRUEBA : RANGO_DIVISION_DIFICIL;
     const divisor = randomInt(rango.divisor[0], rango.divisor[1]);
     const cociente = randomInt(rango.cociente[0], rango.cociente[1]);
-    // Division exacta garantizada: dividendo = divisor * cociente.
     const dividendo = divisor * cociente;
     return armarProblema([dividendo, divisor], cociente, dificultad);
 }
 
-export function generateProblema(operacion: Operacion, dificultad: DificultadNum, esPrueba: boolean = false): ProblemaMatematico {
+export function generateProblema(
+    operacion: Operacion,
+    dificultad: DificultadNum,
+    esPrueba: boolean = false): ProblemaMatematico {
     switch (operacion) {
         case 'suma':
         case 'resta':

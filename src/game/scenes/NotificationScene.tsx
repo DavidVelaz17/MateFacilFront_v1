@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { EventBus } from './patterns';
-import { ACHIEVEMENT_NAME_OVERRIDES, ACHIEVEMENT_TEXTURE_KEYS } from '@/config/achievementIcons';
+import { ACHIEVEMENT_TEXTURE_KEYS } from '@/config/achievementIcons';
 
 interface LogroDesbloqueado {
     codigo: string;
@@ -132,7 +132,7 @@ export class NotificationScene extends Phaser.Scene {
         const icon = textureKey
             ? this.add.image(10, 22, textureKey).setDisplaySize(22, 22).setOrigin(0, 0)
             : this.add.text(10, 22, logro.icono, { fontSize: '22px' });
-        const nombre = this.add.text(42, 20, ACHIEVEMENT_NAME_OVERRIDES[logro.codigo] ?? logro.nombre, {
+        const nombre = this.add.text(42, 20, logro.nombre, {
             fontSize: '13px', color: '#ffffff', fontStyle: 'bold',
         });
         const desc = this.add.text(42, 38, logro.descripcion, {

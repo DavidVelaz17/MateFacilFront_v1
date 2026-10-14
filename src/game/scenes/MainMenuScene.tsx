@@ -50,7 +50,7 @@ export class MainMenuScene extends Phaser.Scene {
     }
 
     private handleSelection(element: 'tierra' | 'agua', operationGroup: string) {
-        this.scene.start('MapScene', {
+        this.scene.start('LogrosScene', {
             config: {
                 gameMode: 'historia',
                 selectedElement: element,

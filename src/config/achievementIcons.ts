@@ -14,11 +14,6 @@ export const ACHIEVEMENT_ICONS: Record<string, string> = {
     a_pulso: "/assets/surgeon_Icon.png",
 };
 
-export const ACHIEVEMENT_NAME_OVERRIDES: Record<string, string> = {
-    remontada: "Zombi",
-    vuelta_al_ruedo: "De Vuelta al Juego",
-};
-
 // Mismas claves que ACHIEVEMENT_ICONS pero como texture keys de Phaser
 // (cargadas en PreloadScene) en vez de rutas web, para usarse dentro del juego.
 export const ACHIEVEMENT_TEXTURE_KEYS: Record<string, string> = {

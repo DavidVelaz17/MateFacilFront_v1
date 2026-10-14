@@ -105,6 +105,10 @@ export class PreloadScene extends Phaser.Scene{
         this.load.image('icono_zombie','/assets/zombie_Icon.png');
         this.load.image('icono_perfecto','/assets/perfect_Icon.png');
 
+        this.load.image('logros','/assets/logros.png');
+        this.load.image('star','/assets/star_Icon.png');
+
+
         this.load.on('loaderror', (fileObj: any) => {
             console.error("Fallo al cargar:", fileObj.src);
         });

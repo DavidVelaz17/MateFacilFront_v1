@@ -8,7 +8,7 @@ import { ArrowLeft, Clock, RotateCcw, Smile, Activity, BarChart, ChevronLeft, Ch
 import {
     ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from "recharts";
-import { ACHIEVEMENT_ICONS, ACHIEVEMENT_NAME_OVERRIDES } from "@/config/achievementIcons";
+import { ACHIEVEMENT_ICONS } from "@/config/achievementIcons";
 
 interface DesgloseEvento {
     orden: number;
@@ -408,7 +408,7 @@ export default function StatsPage() {
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
                                     {stats.logros.map((logro) => {
                                         const iconSrc = ACHIEVEMENT_ICONS[logro.codigo];
-                                        const nombre = ACHIEVEMENT_NAME_OVERRIDES[logro.codigo] ?? logro.nombre;
+                                        const nombre = logro.nombre;
                                         return (
                                         <div
                                             key={logro.codigo}

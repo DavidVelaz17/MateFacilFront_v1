@@ -7,7 +7,7 @@ import {
     ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from "recharts";
 import { ArrowLeft, Printer, Loader2 } from "lucide-react";
-import { ACHIEVEMENT_ICONS, ACHIEVEMENT_NAME_OVERRIDES } from "@/config/achievementIcons";
+import { ACHIEVEMENT_ICONS } from "@/config/achievementIcons";
 
 type Rango = "hoy" | "semana" | "mes" | "personalizado";
 
@@ -277,7 +277,7 @@ export default function ReporteAlumnoPage() {
                             <div className="flex flex-wrap gap-2">
                                 {data.logrosEnPeriodo.map((l) => {
                                     const iconSrc = ACHIEVEMENT_ICONS[l.codigo];
-                                    const nombre = ACHIEVEMENT_NAME_OVERRIDES[l.codigo] ?? l.nombre;
+                                    const nombre = l.nombre;
                                     return (
                                         <span key={l.codigo} className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-3 py-1.5 text-xs font-semibold text-blue-800">
                                             {iconSrc ? (

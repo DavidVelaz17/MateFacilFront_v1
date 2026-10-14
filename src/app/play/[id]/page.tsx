@@ -27,7 +27,8 @@ export default function PlayPage() {
                 totalStars: 0,
                 dificultad: 2,
                 nivelMapaTierra: 0,
-                nivelMapaAgua: 0
+                nivelMapaAgua: 0,
+                logrosDesbloqueados: [] as string[]
             };
 
             if (mode === 'custom' && configString) {
@@ -56,6 +57,11 @@ export default function PlayPage() {
 
                     initialPhaserData.nivelMapaTierra = statsRes.data.nivelMapaTierra || 0;
                     initialPhaserData.nivelMapaAgua = statsRes.data.nivelMapaAgua || 0;
+
+                    const logros: { codigo: string; desbloqueado: boolean }[] = statsRes.data.logros || [];
+                    initialPhaserData.logrosDesbloqueados = logros
+                        .filter((logro) => logro.desbloqueado)
+                        .map((logro) => logro.codigo);
                 }
             } catch (error) {
                 console.error("No se pudo cargar el historial de estrellas:", error);

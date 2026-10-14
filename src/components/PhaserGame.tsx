@@ -21,6 +21,7 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
             const { BootScene } = await import('@/game/scenes/BootScene');
             const { MainMenuScene } = await import('@/game/scenes/MainMenuScene');
             const { MapScene } = await import('@/game/scenes/MapScene');
+            const { LogrosScene } = await import('@/game/scenes/LogrosScene');
             const { GameScene } = await import('@/game/scenes/GameScene');
             const { TransitionScene } = await import('@/game/scenes/TransitionScene');
             const { NotificationScene } = await import('@/game/scenes/NotificationScene');
@@ -55,6 +56,7 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                 gameRef.current.scene.add('PreloadScene', PreloadScene);
                 gameRef.current.scene.add('BootScene', BootScene);
                 gameRef.current.scene.add('MainMenuScene', MainMenuScene);
+                gameRef.current.scene.add('LogrosScene', LogrosScene);
                 gameRef.current.scene.add('MapScene', MapScene);
                 gameRef.current.scene.add('GameScene', GameScene);
                 gameRef.current.scene.add('TransitionScene', TransitionScene);
@@ -65,6 +67,7 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                         console.log("React: Arrancando motor con datos ->", levelData);
                         gameRef.current.registry.set('totalStars', levelData.totalStars || 0);
                         gameRef.current.registry.set('lastDificultad', levelData.dificultad || 2);
+                        gameRef.current.registry.set('logrosDesbloqueados', levelData.logrosDesbloqueados || []);
                         gameRef.current.scene.start('PreloadScene', { config: levelData });
                         // run() en vez de start(): corre en paralelo sin detener
                         // otras escenas, para mostrar avisos encima de cualquiera.
@@ -76,6 +79,7 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
                 console.log("React: Reiniciando motor por nuevos datos ->", levelData);
                 gameRef.current.registry.set('totalStars', levelData.totalStars || 0);
                 gameRef.current.registry.set('lastDificultad', levelData.dificultad || 2);
+                gameRef.current.registry.set('logrosDesbloqueados', levelData.logrosDesbloqueados || []);
                 const sceneManager = gameRef.current.scene;
                 sceneManager.getScenes(true)
                     .filter(scene => scene.scene.key !== 'NotificationScene')
@@ -87,10 +91,27 @@ export default function PhaserGame({ levelData }: PhaserGameProps) {
             }
         };
 
+        // Logros desbloqueados durante la sesion (play/[id]/page.tsx emite
+        // 'logrosUnlocked'): se agregan para que LogrosScene los muestre sin recargar.
+        let offLogrosUnlocked: (() => void) | null = null;
+        const registrarLogrosUnlocked = async () => {
+            const { EventBus } = await import('@/game/scenes/patterns');
+            const handler = (logros: { codigo: string }[]) => {
+                const registry = gameRef.current?.registry;
+                if (!registry) return;
+                const actuales: string[] = registry.get('logrosDesbloqueados') || [];
+                registry.set('logrosDesbloqueados', [...new Set([...actuales, ...logros.map(l => l.codigo)])]);
+            };
+            EventBus.on('logrosUnlocked', handler);
+            offLogrosUnlocked = () => EventBus.off('logrosUnlocked', handler);
+        };
+
         if (typeof window !== 'undefined') {
             initPhaser();
+            registrarLogrosUnlocked();
         }
         return () => {
+            offLogrosUnlocked?.();
             if (gameRef.current) {
                 gameRef.current.destroy(true);
                 gameRef.current = null;
